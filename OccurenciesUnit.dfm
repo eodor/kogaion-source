@@ -1,0 +1,29 @@
+object Occurences: TOccurences
+  Left = 385
+  Top = 280
+  Width = 375
+  Height = 179
+  BorderStyle = bsSizeToolWin
+  Caption = 'Occurences'
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -13
+  Font.Name = 'Tahoma'
+  Font.Style = []
+  FormStyle = fsStayOnTop
+  KeyPreview = True
+  OldCreateOrder = False
+  PixelsPerInch = 115
+  TextHeight = 16
+  object ListBox: TListBox
+    Left = 0
+    Top = 0
+    Width = 357
+    Height = 134
+    Align = alClient
+    ItemHeight = 16
+    TabOrder = 0
+    OnClick = ListBoxClick
+  end
+end

@@ -74,6 +74,12 @@ type
     Name :string;
    end;
 
+   TDependecieKind=(dkFile,dkPath);
+   TDependencie=class
+     kind:TDependecieKind;
+     item:string;
+   end;
+
    TClassRegPage=class(TStringList)
    public
       Page, FileName:string;
@@ -81,7 +87,6 @@ type
       constructor create;
       destructor destroy;override;
    end;
-
 
    TTool=class
    private
@@ -275,6 +280,7 @@ type
 
    TProject=class(TStringList)
    private
+     fDependiences:TStrings;
      fNode:TTreeNode;
      fTree:TTreeView;
      fCompiler:TCompiler;
@@ -292,6 +298,9 @@ type
      procedure SetSwitch(v:string);
      procedure SetTree(v:TTreeView);
    public
+     Icon,ExeExt,DefName,DefValue:string;
+     Debug,DebugInfo,CompileOnly,PreserveO,AddGlobalDef,
+     ErrorCheck,FBDebug,ResumeError,NullPtrCheck,ArrayCheck:boolean;
      constructor create;
      destructor destroy;override;
      function AddPage(v:string):string;overload;
@@ -302,8 +311,9 @@ type
      procedure Dispose;
      procedure BuildSource;
      procedure Read(display:boolean=true);
-     function FindFile(v:string):integer;
+     function FindFile(v:string):TTabSheet;
      procedure UpdatePage(v,n:string);
+     property Dependencies:TStrings read fDependiences;
      property Page:TObject read fPage write fPage;
      property Files:TStrings read fFiles;
      property ModalResult:integer read fModalResult;
@@ -351,8 +361,8 @@ type
     constructor create;
     destructor destroy;override;
     function ResourceExists(v:string):TResourceItem;
-    function AddItem(v:string):TResourceItem;overload;
-    procedure AddItem(v:TResourceItem);overload;
+    function AddItem(v:string; index:integer=-1):TResourceItem;overload;
+    procedure AddItem(v:TResourceItem; index:integer=-1);overload;
     procedure RemoveItem(v:string);
     procedure ClearItems;
     procedure ClearMenus;
@@ -560,7 +570,7 @@ begin
    skiped:=changefileext(bridgefile,'.bi');
    if DirectoryExists(v) then begin
       //FindFiles(fFiles,v,fmask);
-      FindFiles(fFiles,v,'.bi,.bas,.fpk');
+      FindFiles(fFiles,v,'.bi,.bas');
       if fFiles.Count>0 then begin
          for i:=0 to ffiles.Count-1 do begin
              ifl:=format('#include once "%s"',[ffiles[i]]);
@@ -851,6 +861,7 @@ begin
    ActiveProject:=self;
    ActiveObject:=ActiveProject;
    ProjectsList.AddObject(fName,self);
+   fDependiences:=TStringList.Create;
 end;
 
 destructor TProject.destroy;
@@ -866,7 +877,9 @@ begin
           TPageSheet(Code.PageControl.Pages[i]).Project:=nil;
    fFiles.Free;
    if ActiveProject=self then ActiveProject:=nil;
-   if ActiveObject=self then ActiveObject:=nil;       
+   if ActiveObject=self then ActiveObject:=nil;
+   for i:=fDependiences.Count-1 downto 0 do
+
    inherited;
 end;
 
@@ -883,17 +896,33 @@ begin
 end;
 
 procedure TProject.SetFileName(v:string);
+  function GetName:string;
+  var
+     i,x:integer;
+     s:string;
+  begin
+     result:='';
+     i:=pos('isproject',lowercase(Text));
+     if i>0 then begin
+        x:=posex(' ',Text,i+9);
+        s:=copy(Text,i+9,x-(i+9));
+        Name:=s;
+     end ;
+     result:=s;
+  end;
 begin
     fFileName:=v;
     if FileExists(v) then begin
        LoadFromFile(v);
+       Name:=GetName; 
        if fPage<>nil then
-          TPageSheet(fPage).Caption:=ExtractFileName(v);
-       
-       fName:=ChangeFileExt(ExtractFileName(v),'');
-       Saved:=true ;
-       //Read;
+          TPageSheet(fPage).Caption:=ExtractFileName(v)
+       else begin
+            fPage:=newEditor(v);
+            TPageSheet(fPage).Project:=Self;
+            end;
        if fNode<>nil then fNode.Text:=fName;
+       Saved:=true ;
     end;
 end;
 
@@ -937,16 +966,15 @@ begin
     end ;
 end;
 
-function TProject.FindFile(v:string):integer;
+function TProject.FindFile(v:string):TTabSheet;
 var
    i:integer;
 begin
-    result:=-1;
+    result:=nil;
     if v='' then exit;
     for i:=0 to fFiles.Count-1 do begin
         if comparetext(fFiles[i],v)=0 then begin
-           result:=i;
-           if fFiles.Objects[i]<>nil then result:=integer(fFiles.Objects[i]);
+           result:=TPageSheet(fFiles.Objects[i]);
            break
         end
     end
@@ -954,38 +982,32 @@ end;
 
 function TProject.AddPage(v:TTabSheet):string;
 var
-  vt:integer;
-  o:TObject;
+  vt:TTabSheet;
   Ps:TPageSheet;
 begin
     result:='';
     if v=nil then exit;
     vt:=FindFile(TPageSheet(v).FileName);
-    if vt=-1 then begin
+    if vt=nil then begin
        Ps:=TPageSheet(v);
        Ps.Project:=self;
        if fNode<>nil then
           if fTree<>nil then
              Ps.Node:=fTree.Items.AddChildObject(fNode,Ps.Name,Ps);
        fFiles.AddObject(Ps.FileName,Ps)
-    end else begin
-       o:=TObject(vt);
-       if o<>nil then
-          if o.InheritsFrom(TPageSheet) then
-             Code.PageControl.ActivePage:=TPageSheet(o);
-    end
+    end else
+        Code.PageControl.ActivePage:=TPageSheet(vt);
 end;
 
 function TProject.AddPage(v:string):string;
 var
-  vt:integer;
-  o:TObject;
+  vt:TTabSheet;
   Ps:TPageSheet;
 begin
     result:='';
     if v='' then exit;
     vt:=FindFile(v);
-    if vt=-1 then begin
+    if vt=nil then begin
        if fNode<>nil then
           if fTree<>nil then begin
              Ps:=newEditor(v);
@@ -1010,30 +1032,35 @@ var
    s,n,icf:string;
 label
    skip;
-begin 
+begin
     if Count=0 then exit;
     i:=0;
     s:='';
     repeat                  
-          s:=trim(self[i]); 
+          s:=trim(self[i]);
           if pos('''',s)=1 then goto skip;
-          if (pos('/''',s)>0) and (pos ('''/',s)>pos('/''',s)) then
-             s:=trim(copy(s,pos('''/',s)+1,length(s)));
-          if (pos('/''',s)>0) and (pos ('''/',s)=0) then
-          {   repeat
-                   s:=trim(self[i]);
-                   if (pos('''/',s)>0) then break;
-                   inc(i);
-             until i>Count-1;}
-           
-          if pos('#define ',lowercase(s))>0 then begin
+          if s='' then goto skip;
+          if (pos('/''',s)>0) and (pos('''/',s)=0) then begin
+             s:=copy(s,1,pos('/''',s)-1); 
+             repeat
+                  if pos('''/',s)>0 then begin
+                     inc(i);
+                     s:=trim(self[i]);
+                     break;
+                  end;
+                  s:=trim(self[i]);
+                  inc(i);
+             until (i>Count-1);
+          end; 
+
+          if pos('#define ',lowercase(Text))>0 then begin
              i:=pos('isproject',lowercase(Text));
              if i>0 then begin
                 x:=posex(' ',Text,i+9);
                 s:=copy(Text,i+9,x-(i+9));
-                Name:=s;
+                Name:=s; showmessage('is '+s);
              end ;
-             i:=pos('compiler',lowercase(Text));
+            { i:=pos('compiler',lowercase(Text));
              if i>0 then begin
                 x:=posex(' ',Text,i+9);
                 s:=copy(Text,i+9,x-(i+9));
@@ -1044,23 +1071,23 @@ begin
                 x:=posex(' ',Text,i+6);
                 s:=copy(Text,i+6,x-(i+6));
                 Compiler.Switch:=s;
-             end ;
+             end ; 
              i:=pos('target',lowercase(Text));
              if i>0 then begin
                 x:=posex(' ',Text,i+6);
                 s:=copy(Text,i+6,x-(i+6));
                 Compiler.Target:=s;
-             end ;
+             end ;}
           end;
 
-          if pos('#include ',lowercase(s))>0 then begin  
+          if pos('#include ',lowercase(s))>0 then begin
              icf:=copy(s,pos('"',s)+1,lastdelimiter('"',s)-pos('"',s)-1);
              if FileExists(icf) then
-                AddPage( icf);  
+                AddPage( icf);
           end;
           skip:
           inc(i);
-    until i>Count-1;
+    until i>Count-1; 
 end;
 
 procedure TProject.BuildSource;
@@ -1424,7 +1451,7 @@ begin
    Add('');
    AddStrings(fMenus);
    Add('');
-   AddStrings(fPopupMenus);
+   AddStrings(fPopupMenus); 
 end;
 
 function TResources.ResourceExists(v:string):TResourceItem;
@@ -1449,23 +1476,23 @@ begin
     end
 end;
 
-function TResources.AddItem(v:string):TResourceItem;
+function TResources.AddItem(v:string; index:integer=-1):TResourceItem;
 begin
    if ResourceExists(v)=nil then begin
       result:=TResourceItem.Create;
       result.FileName:=v;
-      fitems.AddObject(result.Name,result)  ;
+      if index=-1 then fitems.AddObject(result.Name,result) else fitems.InsertObject(index,result.Name,result) ;
    end else messageDlg(format('Resource file %s not exists.',[v]),mtInformation,[mbok],0);
 end;
 
-procedure TResources.AddItem(v:TResourceItem);
+procedure TResources.AddItem(v:TResourceItem; index:integer=-1);
 begin
    if v=nil then begin
       messageDlg(format('Resource file %s not exists.',[v]),mtInformation,[mbok],0);
       exit;
    end;
    if ResourceExists(v.Name)=nil then
-      fitems.AddObject(v.Name,v)
+      if index=-1 then fitems.AddObject(v.Name,v) else fitems.InsertObject(index,v.Name,v)
    else
       messageDlg(format('Resource %s exists.',[v]),mtInformation,[mbok],0);
 end;

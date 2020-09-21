@@ -615,6 +615,7 @@ begin
       x:=posex(' ',L.Text,i+9);
       s:=copy(L.Text,i+9,x-(i+9));
       newProject.Load(v);
+
       ActiveProject.Name:=s;
    end else newEditor(v);
    L.Free;
@@ -808,6 +809,21 @@ begin
                     ActiveTool.InMenu:=boolean(strtoint(v));
              end
          end;
+         if ActiveProject<>nil then begin
+            ActiveProject.ExeExt:=ReadString('Project','exeext','');
+            ActiveProject.DefName:=ReadString('Project','defname','');
+            ActiveProject.DefName:=ReadString('Project','defvalue','');
+            ActiveProject.Debug:=ReadBool('Project','debug',false);
+            ActiveProject.DebugInfo:=ReadBool('Project','debuginfo',false);
+            ActiveProject.CompileOnly:=ReadBool('Project','compileonly',false);
+            ActiveProject.PreserveO:=ReadBool('Project','preserveo',false);
+            ActiveProject.AddGlobalDef:=ReadBool('Project','addglobaldef',false);
+            ActiveProject.ErrorCheck:=ReadBool('Project','errorcheck',false);
+            ActiveProject.FBDebug:=ReadBool('Project','fbdebug',false);
+            ActiveProject.ResumeError:=ReadBool('Project','resumeerror',false);
+            ActiveProject.NullPtrCheck:=ReadBool('Project','nullptrcheck',false);
+            ActiveProject.ArrayCheck:=ReadBool('Project','arraycheck',false);
+         end;
          Free
     end;
     L.Free;
@@ -910,6 +926,19 @@ begin
              WriteString('MRUFiles',fMRUFiles[i],format('%d',[i]));
          for i:=0 to  fMRUExes.Count-1 do
              WriteString('MRUExes',fMRUExes[i],format('%d',[i]));
+         WriteString('Project','exeext',ActiveProject.ExeExt);
+         WriteString('Project','defname',ActiveProject.DefName);
+         WriteString('Project','defvalue',ActiveProject.DefName);
+         WriteBool('Project','debug',ActiveProject.Debug);
+         WriteBool('Project','debuginfo',ActiveProject.DebugInfo);
+         WriteBool('Project','compileonly',ActiveProject.CompileOnly);
+         WriteBool('Project','preserveo',ActiveProject.PreserveO);
+         WriteBool('Project','addglobaldef',ActiveProject.AddGlobalDef);
+         WriteBool('Project','errorcheck',ActiveProject.ErrorCheck);
+         WriteBool('Project','fbdebug',ActiveProject.FBDebug);
+         WriteBool('Project','resumeerror',ActiveProject.ResumeError);
+         WriteBool('Project','nullptrcheck',ActiveProject.NullPtrCheck);
+         WriteBool('Project','arraycheck',ActiveProject.ArrayCheck);
          Free;
     end; SaveOptionsContainer;
 end;
@@ -989,6 +1018,7 @@ procedure TLauncher.Compile;
 var
    ext,c,incPaths:string;
    i:integer;
+   R:TStrings;
 begin
     Compiler.Clear;
     Debugger.Reset;
@@ -1019,6 +1049,11 @@ begin
        end;
        if ActiveProject.ModalResult=2 then exit;
        Compiler.Params:=ActiveProject.FileName;
+       if ActiveProject.Switch<>'' then
+          Launcher.Compiler.Switch:=ActiveProject.Switch;
+       if FileExists(ActiveProject.Icon) then begin
+          Resources.AddItem(ActiveProject.Icon,0);
+       end
    end else if ActiveEditor<>nil then Compiler.Params:=ActiveEditor.FileName;
 
    if ResourcesEmbed then
@@ -1037,9 +1072,11 @@ begin
            incPaths:=incPaths+format(' -i "%s"',[Settings.ListBoxDirs.Items[i]]);
    end else incPaths:='';
 
-   Launcher.Compiler.Switch:=Launcher.Switch+' '+incPaths+' '+Resources.FileName+' '+Compiler.Switch+format(' -include "%s"',[Launcher.Lib.MainFile]);
+   if Launcher.Compiler.Switch<>'' then
+      Compiler.Switch:=Launcher.Compiler.Switch
+   else
+      Compiler.Switch:=incPaths+' '+Resources.FileName+' '+Compiler.Switch+format(' -include "%s"',[Launcher.Lib.MainFile]);
 
-   Compiler.Switch:=Launcher.Compiler.Switch;
    Compiler.Compile;//Run;
    if FileExists(Compiler.Outfile) then
       AddMRUExe(Compiler.Outfile);
@@ -1399,6 +1436,7 @@ function TLauncher.ClassesByModule(v:string;var L:TStringList):boolean;
 var
    Sc:TScanner;
 begin
+    result:=false;
     if FileExists(v) then begin
        Sc:=TScanner.create;
        Sc.FileName:=v;
@@ -1406,7 +1444,7 @@ begin
        L.Assign(Sc.Types);
        Sc.Free;
        result:=L.Count>0;
-    end
+    end ;
 end;
 
 function TLauncher.RegisteredClassesByModule(v:string; var L:TStringList):boolean;

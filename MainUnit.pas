@@ -214,6 +214,10 @@ type
     N35: TMenuItem;
     pdmenuViewasResourceScript: TMenuItem;
     PopupMenuHelps: TPopupMenu;
+    N42: TMenuItem;
+    menuFileType: TMenuItem;
+    N43: TMenuItem;
+    menuOptions: TMenuItem;
     procedure FormShow(Sender: TObject);
     procedure tbDialogClick(Sender: TObject);
     procedure tbUnitsClick(Sender: TObject);
@@ -316,6 +320,8 @@ type
     procedure menuOpenClick(Sender: TObject);
     procedure menuCodeEditorClick(Sender: TObject);
     procedure menuClassicClick(Sender: TObject);
+    procedure menuFileTypeClick(Sender: TObject);
+    procedure menuOptionsClick(Sender: TObject);
   private
     { Private declarations }
     fversion,fuser,fosversion,fcomputer:string;
@@ -440,10 +446,12 @@ uses CodeUnit, ObjectsTreeUnit, InspectorUnit, DialogsListUnit,
      SettingsUnit, ToolsUnit, FindDialogUnit, SearchInFilesUnit,
      ReplaceDialogunit, SearchFileUnit, GoToLineUnit, SplashUnit,
      LanguagesUnit, ProjectPropertiesUnit, ActiveXUnit, ResourceDialogUnit,
-     MenuEditorUnit, newItemUnit, CloseSelectionUnit, test_eleframe;
+     MenuEditorUnit, newItemUnit, CloseSelectionUnit, test_eleframe,
+  AssociationsUnit;
 
 {$R *.dfm}
 {$R 'gui_files.res'}
+{$R 'icons.res'}
 
 procedure BuildMode(v:TIDEMode=mdDelphi);
 var
@@ -976,8 +984,8 @@ begin
                     if v.Dialog=nil then  
                        v.HasDialog:=true;
 
-                    v.Dialog.Extends:=s.Typ[i].Extends;
-                    v.Dialog.Hosted:=s.Typ[i].Hosted;
+                    v.Dialog.Typ.Extends:=s.Typ[i].Extends;
+                    v.Dialog.Typ.Hosted:=s.Typ[i].Hosted;
                     NamesList.RemoveName(v.Dialog.Name);
 
                     v.Dialog.Caption:=v.Dialog.Name;
@@ -1015,7 +1023,7 @@ begin
                                end
                             end;
                             if (pos('type ',lowercase(v.Frame.Edit.Lines[j]))>0) and
-                               (pos(lowercase(v.Dialog.Hosted),lowercase(v.Frame.Edit.Lines[j]))>0)then
+                               (pos(lowercase(v.Dialog.Typ.Hosted),lowercase(v.Frame.Edit.Lines[j]))>0)then
                                canread:=true;
                             if (pos('end ',lowercase(v.Frame.Edit.Lines[j]))>0) and
                                (pos(' type',lowercase(v.Frame.Edit.Lines[j]))>0)then begin
@@ -1030,7 +1038,7 @@ begin
                                (pos('destructor ',lowercase(v.Frame.Edit.Lines[j]))>0) or
                                (pos('operator ',lowercase(v.Frame.Edit.Lines[j]))>0) or
                                (pos('property ',lowercase(v.Frame.Edit.Lines[j]))>0) ) and
-                               (pos(lowercase(v.Dialog.Hosted),lowercase(v.Frame.Edit.Lines[j]))>0)then
+                               (pos(lowercase(v.Dialog.Typ.Hosted),lowercase(v.Frame.Edit.Lines[j]))>0)then
                                canread:=true;
                             if (pos('end ',lowercase(v.Frame.Edit.Lines[j]))>0) and
                                ((pos('function ',lowercase(v.Frame.Edit.Lines[j]))>0) or
@@ -1232,7 +1240,7 @@ begin
          Filter:=Launcher.Filter;
          if Filter='' then
             Filter:='FreeBasic Files (*.bas,*.bi,*.fpk)|*.bas;*.bi;*.fpk|FreeBasic code (*.bas)|*.bas|FreeBasic include (*.bi)|*.bi|FreeBac package (*.fpk)|*.fpk|Resourcescript file (*.rc)|*.rc|All files (*.*)|*.*';
-         FilterIndex:=6;
+         FilterIndex:=7;
          if Execute then
             Launcher.Load(Files);
          Free
@@ -1601,7 +1609,7 @@ begin
        i:=NamesList.IndexOf(ActiveDialog.Name);
        if i>-1 then NamesList.Delete(i);
        ActiveDialog.Name:=NamesList.AddName('Frame');
-       TPageSheet(ActiveDialog.Page).Frame.Edit.Lines.Insert(0,format('#define Register%s "%s"',[ActiveDialog.Name,ActiveDialog.Hosted]));
+       TPageSheet(ActiveDialog.Page).Frame.Edit.Lines.Insert(0,format('#define Register%s "%s"',[ActiveDialog.Name,ActiveDialog.Typ.Hosted]));
     end
 end;
 
@@ -2244,7 +2252,16 @@ begin
    Code.Visible:=TMenuItem(sender).Checked
 end;
 
+procedure TMain.menuFileTypeClick(Sender: TObject);
+begin
+    Associations.ShowModal
+end;
 
+procedure TMain.menuOptionsClick(Sender: TObject);
+begin
+   if ProjectProperties.ShowModal=mrok then
+   ;
+end;
 
 initialization
    registerClasses([TResourceExport]);

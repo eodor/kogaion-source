@@ -1,6 +1,6 @@
 object Dialog: TDialog
-  Left = 795
-  Top = 356
+  Left = 627
+  Top = 218
   Width = 554
   Height = 352
   Caption = 'Dialog'
@@ -36,7 +36,6 @@ object Dialog: TDialog
     0003800000038000000380000003800000038000000380000003800000038000
     00038000000380000003800000038000000780000007FFFFFFFFFFFFFFFF}
   OldCreateOrder = False
-  OnActivate = FormActivate
   OnCanResize = FormCanResize
   OnResize = FormResize
   OnShow = FormShow

@@ -10,7 +10,7 @@ uses
   Dialogs, ResourceExport, Menus, ImgList, XPMan, ComCtrls, ToolWin,
   ExtCtrls, LauncherUnit, DialogUnit, TypesUnit, PageSheetUnit, DebuggerUnit,
   CompilerUnit, HelperUnit, CompletionDataBase, ScripterUnit,
-  PropEditorsUnit;
+  PropEditorsUnit,ELSuperEdit;
 
 type
   TMain = class(TForm)
@@ -180,7 +180,6 @@ type
     menuIDEMode: TMenuItem;
     menuVB: TMenuItem;
     menuDelphi: TMenuItem;
-    menuClassic: TMenuItem;
     menuWindows: TMenuItem;
     menuCascade: TMenuItem;
     menuTile: TMenuItem;
@@ -319,9 +318,13 @@ type
     procedure menuOnlineHelpClick(Sender: TObject);
     procedure menuOpenClick(Sender: TObject);
     procedure menuCodeEditorClick(Sender: TObject);
-    procedure menuClassicClick(Sender: TObject);
     procedure menuFileTypeClick(Sender: TObject);
     procedure menuOptionsClick(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+    procedure menuVBClick(Sender: TObject);
+    procedure menuDelphiClick(Sender: TObject);
+    procedure menuAboutClick(Sender: TObject);
   private
     { Private declarations }
     fversion,fuser,fosversion,fcomputer:string;
@@ -376,7 +379,7 @@ type
     procedure EnableOnRun;
     procedure CopyLibRTTi;
     procedure ReadScripts;
-    procedure AnimateNewDialog;
+    procedure FreeModules;
   published
     property User :string read fuser;
     property Computer:string read fcomputer;
@@ -384,26 +387,30 @@ type
     property Version:string read fversion;
   end;
 
+  procedure SetEditMode(v:TELEditMode=moEdit);
+
   function newEditor(v:string=''):TPageSheet;
   function newDialog(v:string=''):TDialog;
   function newProject(v:string=''):TProject;
 
-  function PnewEditor(v:PChar=nil):TPageSheet;stdcall;
-  function PnewDialog(v:PChar=nil):TDialog;stdcall;
-  function PnewProject(v:PChar=nil):TProject;stdcall;
+  function PnewEditor(v:PChar=nil):TPageSheet;stdcall;far;
+  function PnewDialog(v:PChar=nil):TDialog;stdcall;far;
+  function PnewProject(v:PChar=nil):TProject;stdcall;far;
 
   procedure DiscardBridge;stdcall;
   function LoadBridge:PChar;stdcall;
 
   procedure ExtractGUI;stdcall;
-  procedure BuildMode(v:TIDEMode=mdDelphi);
+  procedure BuildMode(v:TIdeMode=mdVB);
 
   type
+   PDataRecord=^TDataRecord;
    TDataRecord=record
-   Menu:TMenuItem;
-   PageControl:TPageControl;
-   NewEditor:function(v:PChar=nil):TObject;stdcall;
-   NewDialog:function(v:PChar=nil):TObject;stdcall;
+     Menu:TMainMenu;
+     MenuItem:TMenuItem;
+     PageControl:TPageControl;
+     VTProcSize:cardinal;
+     VTProcs:array of Pointer;
   end;
   
 
@@ -424,14 +431,17 @@ var
   Debugger:TDebugger;
   Compiler:TCompiler;
   Bridge,user,Module:hmodule;
-  Extensions:array of hmodule;
   ExtensionsList:TStrings;
-  ShowAbout:procedure ; stdcall;
-  SendData:function(var DR :TDataRecord):boolean; stdcall;
+  DllModules:TStrings;
+  ShowAbout:function(modal:boolean=true):integer ; stdcall;
+  SendData:function(var DR :PDataRecord):boolean; stdcall;
   AboutGUI:function:PChar;stdcall;
+  LoadPlugin:function(app:TApplication=nil):Pointer;stdcall;
   LoadPack:function:integer;stdcall;
   iUser:function(v:TWinControl):boolean;stdcall;
   UnloadPack:function:integer;stdcall;
+  P:TPanel;
+  Ls,Ts:TSplitter;
 
 const
     IMAGE_DLLCHARACTERISTICS_NX_COMPAT = $0100;
@@ -447,86 +457,134 @@ uses CodeUnit, ObjectsTreeUnit, InspectorUnit, DialogsListUnit,
      ReplaceDialogunit, SearchFileUnit, GoToLineUnit, SplashUnit,
      LanguagesUnit, ProjectPropertiesUnit, ActiveXUnit, ResourceDialogUnit,
      MenuEditorUnit, newItemUnit, CloseSelectionUnit, test_eleframe,
-  AssociationsUnit;
+     AssociationsUnit,DialogSheetUnit;
 
 {$R *.dfm}
-{$R 'gui_files.res'}
-{$R 'icons.res'}
 
-procedure BuildMode(v:TIDEMode=mdDelphi);
+procedure BuildMode(v:TIdeMode=mdVB);
 var
-   P:TPanel;
-   Ls,Ts:TSplitter;
+   DS:TDialogSheet;
+   i:integer;
 begin
     case v of
        mdVB:begin
           main.Constraints.MaxHeight:=0;
-          P:=TPanel.Create(nil);
-          with P do begin
-               Align:=alLeft;
-               
-               ObjectsTree.Parent:=P;
-               Inspector.Parent:=P;
-               ObjectsTree.BorderStyle:=Forms.bsNone;
-               ObjectsTree.Align:=alTop;
-               Ts:=TSplitter.Create(P);
-               with Ts do begin
-                    Align:=alTop;
-                    Top:=Inspector.Height;
-                    Parent:=P;
-               end;
-               Inspector.BorderStyle:=Forms.bsNone;
-               Inspector.Align:=alClient;
-               Parent:=main;
-               Ls:=TSplitter.Create(P);
-               with Ls do begin
-                    Align:=alLeft;
-                    Left:=P.Width;
-                    Parent:=Main;
-               end;
-               Code.Parent:=Main;
-               Code.Align:=alClient;
-               Code.BorderStyle:=Forms.bsNone;
-               main.Height:=screen.WorkAreaHeight-12;
-          end
+          main.Constraints.MinHeight:=0;
+          if P=nil then begin
+             P:=TPanel.Create(nil);
+             P.Width:=200;
+             P.Parent:=main;
+             P.Align:=alLeft;
+          end;
+          if Ls=nil then begin
+                Ls:=TSplitter.Create(nil);
+                with Ls do begin
+                  Left:=P.Width;
+                  Width:=3;
+                  Parent:=Main;
+                  Align:=alLeft;
+                end;
+          end;
+
+          ObjectsTree.Parent:=P;
+          ObjectsTree.BorderStyle:=Forms.bsNone;
+          ObjectsTree.Align:=alTop;
+          ObjectsTree.Top:=0;
+          ObjectsTree.Height:=200;
+          if Ts=nil then begin
+             Ts:=TSplitter.Create(nil);
+             with Ts do begin
+                  Parent:=P;
+                  Top:=ObjectsTree.Height;
+                  Align:=alTop;
+                  Height:=3;
+              end;
+          end;
+          Inspector.Top:=ObjectsTree.Height+3;
+          Inspector.Parent:=P;
+          Inspector.BorderStyle:=Forms.bsNone;
+          Inspector.Align:=alClient;
+
+          Code.Parent:=Main;
+          Code.Align:=alClient;
+          Code.BorderStyle:=Forms.bsNone;
+          main.Height:=screen.WorkAreaHeight-12;
+          if DialogsList.Count>0 then begin
+             for i:=0 to DialogsList.Count-1 do begin
+                 TDialog(DialogsList.Objects[i]).ELDesigner.Active:=false;
+                 TDialog(DialogsList.Objects[i]).ELDesigner.DesignControl:=nil;
+                 DS:=TDialogSheet.Create(nil);
+                 DS.PageControl:=Code.PageControl;
+                 DS.Caption:=TDialog(DialogsList.Objects[i]).Caption;
+                 TDialog(DialogsList.Objects[i]).Left:=10;
+                 TDialog(DialogsList.Objects[i]).Top:=10;
+                 TDialog(DialogsList.Objects[i]).Sheet:=DS;
+                 Windows.SetParent(TDialog(DialogsList.Objects[i]).Handle,DS.Handle);
+                 TDialog(DialogsList.Objects[i]).ELDesigner.DesignControl:=TDialog(DialogsList.Objects[i]);
+                 TDialog(DialogsList.Objects[i]).ELDesigner.Active:=false;
+             end
+           end
+
        end;
        mdDelphi:begin
+          main.Top:=0;
+          main.Left:=0;
           main.Constraints.MaxHeight:=130;
+          main.Constraints.MinHeight:=130;
+          main.Width:=screen.DesktopWidth;
+
           ObjectsTree.Parent:=nil;
+          Inspector.Parent:=nil;
+          Code.Parent:=nil;
           ObjectsTree.Align:=alNone;
           ObjectsTree.BorderStyle:=bsSizeToolWin;
-          Inspector.Parent:=nil;
+
           Inspector.Align:=alNone;
           Inspector.BorderStyle:=bsSizeToolWin;
           Code.Parent:=nil;
           Code.Align:=alNone;
-          Code.BorderStyle:=Forms.bsSizeable;
-          main.Top:=0;
-          main.Left:=0;
-          main.Width:=screen.DesktopWidth;
+          Code.BorderStyle:=Forms.bsSizeable; 
+
           ObjectsTree.Top:=main.Height+2;
           ObjectsTree.Height:=150;
           ObjectsTree.Width:=200;
+
           Inspector.Width:=200;
           Inspector.Top:=ObjectsTree.Top+ObjectsTree.Height+2;
           Inspector.Height:=screen.WorkAreaHeight-main.Height-objectsTree.Height-4;
+
           Code.Left:=inspector.Width;
           Code.Width:=screen.WorkAreaWidth-Inspector.Width-2;
           Code.Top:=main.Height+2;
-          Code.Height:=screen.WorkAreaHeight-main.Height-2;
-          if Ls<>nil then Ls.Free;
-          if Ts<>nil then Ts.Free;
-          if P<>nil then P.Free;
+          Code.Height:=screen.WorkAreaHeight-main.Height-2; 
+
+
+
+          if DialogsList.Count>0 then begin
+             for i:=0 to DialogsList.Count-1 do begin
+                TDialog(DialogsList.Objects[i]).ELDesigner.Active:=false;
+                TDialog(DialogsList.Objects[i]).ELDesigner.DesignControl:=nil;
+                if TDialog(DialogsList.Objects[i]).Sheet<>nil then begin
+                   TDialog(DialogsList.Objects[i]).Parent:=nil;
+                   TDialog(DialogsList.Objects[i]).Sheet.Free;
+                end ;
+                TDialog(DialogsList.Objects[i]).ELDesigner.DesignControl:=TDialog(DialogsList.Objects[i]);
+                TDialog(DialogsList.Objects[i]).ELDesigner.Active:=false;
+             end
+          end;
        end;
-       mdClassic:begin
-       end
     end
 end;
 
-procedure TMain.menuClassicClick(Sender: TObject);
+procedure TMain.FreeModules;
+var
+ i :integer;
 begin
-    if TMenuItem(Sender)=menuVB then BuildMode(mdVB);
-    if TMenuItem(Sender)=menuDelphi then BuildMode(mdDelphi);
+       for i:=DllModules.Count-1 downto 0 do
+        if DllModules.Objects[i]<>nil then
+           if TDllModule(DllModules.Objects[i]).Handle>0 then
+              FreeLibrary(TDllModule(DllModules.Objects[i]).Handle) ;
+   DllModules.Clear           
 end;
 
 procedure DiscardBridge;
@@ -554,68 +612,34 @@ end;
 procedure TMain.LoadExtensions;
 var
    i:integer;
-   DR:TDataRecord;
+   DR:PDataRecord;
+   Em:HMODULE;
+   P:Pointer;
 begin
-    FindFiles(ExtensionsList,ideDir+'extensions\','*.dll');
-    SetLength(Extensions,length(Extensions)+1);
+    New(DR);
+    FindFiles(ExtensionsList,ideDir+'extensions\','.dll');
     for i:=0 to ExtensionsList.Count-1 do begin
-        Extensions[i]:=LoadLibrary(PChar(ExtensionsList[i]));
-        ShowAbout:=GetProcAddress(Extensions[i],'ShowAbout');
-        if Assigned(@ShowAbout) then showabout();
-        SendData:=GetProcAddress(Extensions[i],'SendData');
-        DR.PageControl:=Code.PageControl;
-        DR.Menu:=menuAbout;
-        DR.NewEditor:=@pnewEditor;
-        DR.NewDialog:=@pnewDialog;
+        Em:=LoadLibrary(PChar(ExtensionsList[i]));
+        ExtensionsList.Objects[i]:=TObject(Em);
+        LoadPlugin:=GetProcAddress(Em,'Load');
+        if Assigned(LoadPlugin) then P:=LoadPlugin(Application);
+        if P<>nil then begin
+        ShowAbout:=GetProcAddress(Em,'ShowAbout');
+        if Assigned(@ShowAbout) then showabout(true);
+        try
+               SendData:=GetProcAddress(Em,'SendData');
+        except end;
+        DR^.PageControl:=Code.PageControl;
+        DR^.Menu:=MainMenu;
+        DR^.MenuItem:=menuAbout;
+        SetLength(DR^.VTProcs,2);
+        DR^.VTProcSize:=sizeof(DR.VTProcs);
+        DR^.VTProcs[0]:=@pnewEditor;
+        DR^.VTProcs[1]:=@pnewDialog;
         if Assigned(@SendData) then SendData(DR);
+        end
     end
 
-end;
-
-procedure TMain.AnimateNewDialog;
-type
-    PCtrlRect=^TCtrlRect;
-    TCtrlRect=record
-    Control:TControl;
-    R:TRect;
-   
-    end;
-var
-   i:integer;
-   L:TStringList;
-   CR:PCtrlRect;
-   eu: array [0..1] of TInput;
-
-   function GetControlCoor(v:string):TRect;
-   var
-      i:integer;
-   begin
-      i:=L.IndexOf(v) ; 
-      if i>-1 then begin
-         CR:=PCtrlRect(L.Objects[i]);
-         result:=CR^.R;
-      end
-   end;
-begin
-   L:=TStringList.Create;
-   for i:=0 to ControlCount-1 do begin
-          New(CR);
-          CR^.Control:=Controls[i];
-          if GetWindowRect(TWinControl(Controls[i]).Handle,CR^.R) then
-             L.AddObject(CR^.Control.Name,TObject(CR));
-   end;
-   SetCursorPos(GetControlCoor('PanelTools').Left+4,GetControlCoor('PanelTools').Right+4);
-   L.Free;
-   SetCursorPos(20, Screen.Height-20); //set cursor to Start menu coordinates
-   ZeroMemory(@eu,sizeof(eu));
-   eu[0].Itype := INPUT_MOUSE;
-   eu[0].mi.dwFlags :=MOUSEEVENTF_LEFTDOWN;
-   //eu[1].Itype := INPUT_MOUSE;
-   //eu[1].mi.dwFlags :=MOUSEEVENTF_LEFTUP;
-   eu[1].Itype := INPUT_KEYBOARD;
-   eu[1].ki.dwFlags:=KEYEVENTF_EXTENDEDKEY;
-   eu[1].ki.wVK:=vk_lWIN;
-   SendInput(2,eu[0],sizeof(TInput));
 end;
 
 procedure TMain.ReadScripts;
@@ -648,8 +672,9 @@ procedure TMain.UnloadExtensions;
 var
    i:integer;
 begin
-   for i:=low(extensions) to high(extensions) do
-       if extensions[i]>0 then FreeLibrary(extensions[i]);
+   for i:=0 to ExtensionsList.Count-1 do
+       if ExtensionsList.Objects[i]<>nil then FreeLibrary(hmodule(ExtensionsList.Objects[i])); {}
+    ExtensionsList.Clear
 end;
 
 type
@@ -658,7 +683,6 @@ type
       Name,FileName :string;
    end;
 procedure TMain.HelpClick(Sender :TObject);
-
 var
    s :PHelpStruct;
    pid :cardinal;
@@ -849,7 +873,17 @@ begin
    tbResetProgram.Enabled:=true;
 end;
 
+procedure SetEditMode(v:TELEditMode=moEdit);
+var
+   i:integer;
+begin
+    for i:=0 to Code.PageControl.PageCount-1 do
+        if Code.PageControl.Pages[i].InheritsFrom(TPageSheet) then
+           TPageSheet(Code.PageControl.Pages[i]).Frame.Edit.Mode:=v;
+end;
+
 procedure TMain.CompilerError(Sender:TObject);
+    
 begin
     if Compiler.ExitCode=file_not_exists then
        Caption:='Kogaion -File in ERROR [file not exists. save it first]'
@@ -860,7 +894,8 @@ begin
     if ActiveResult<>nil then begin
        ActiveResult.Edit.Lines.Assign(Compiler.Outputs);
        Debugger.Text:=Compiler.Outputs.Text;
-       Debugger.Scan
+       Debugger.Scan ;
+       SetEditMode(moDebug);
     end ;
     RestoreAfterRun;
     EnableOnRun;
@@ -948,10 +983,9 @@ begin
        s:=nil;
     if (self<>nil) and (s<>nil) then begin
        if v<>nil then s.FileName:=v.FileName;
-       if s.Count>0 then
-          if FileExists(ideDir+'gui\core.bi') then
-             s.Scan;
-    end;
+       if s.Count>0 then s.Scan;
+    end else
+    exit;
     canCreate:=false;
     canRead:=false;
     if s<>nil then
@@ -959,7 +993,7 @@ begin
           for i:=0 to s.Variables.Count-1 do begin
               fs:=TField(s.Variables.Objects[i]);
               bt:=ActiveEditor.Scanner.TypExists(fs.Return);
-              if bt<>nil then cancreate:=true;;
+              if bt<>nil then cancreate:=true;
               break
           end;
     t:=Launcher.Lib.MainType;
@@ -993,16 +1027,19 @@ begin
                        v.Dialog.Page.Caption:=ExtractFileName(v.FileName);
                        for j:=0 to v.Frame.Edit.Lines.Count-1 do begin
                            if pos('this.',lowercase(v.Frame.Edit.Lines[j]))>0 then begin
-                              v.Frame.Edit.Lines.Objects[j]:=v.Dialog;
+
                               if pos('this.name',lowercase(v.Frame.Edit.Lines[j]))>0 then begin
                                  tk:=trim(v.Frame.Edit.Lines[j]);
                                  v.Dialog.Name:=trim(copy(tk,pos('"',tk)+1,lastdelimiter('"',tk)-pos('"',tk)-1));
+                                 v.Frame.Edit.Lines.Objects[j]:=v.Dialog;
                               end;
                               if pos('this.text',lowercase(v.Frame.Edit.Lines[j]))>0 then begin
                                  tk:=trim(v.Frame.Edit.Lines[j]);
                                  v.Dialog.Caption:=trim(copy(tk,pos('"',tk)+1,lastdelimiter('"',tk)-pos('"',tk)-1));
+                                 v.Frame.Edit.Lines.Objects[j]:=v.Dialog;
                               end;
                               if (pos('this.setbounds(',lowercase(v.Frame.Edit.Lines[j]))>0) or (pos('setbounds(',lowercase(v.Frame.Edit.Lines[j]))>0) then begin
+                                 v.Frame.Edit.Lines.Objects[j]:=v.Dialog;
                                  tk:=trim(v.Frame.Edit.Lines[j]);
                                  prms:=copy(tk,pos('(',tk)+1,pos(')',tk)-pos('(',tk)-1);
                                  L:=TStringList.Create;
@@ -1052,7 +1089,7 @@ begin
                                v.Frame.Edit.Lines.Objects[j]:=v.Dialog;
                        end;
                     end;
-                    break;
+                    //break;
                  end
               end
           end
@@ -1082,7 +1119,8 @@ var
 begin
     for i:=PagesList.Count-1 downto 0 do
         try
-           result:=TPageSheet(PagesList.Objects[i]).Dispose;
+         if PagesList.Objects[i]<>nil then
+            result:=TPageSheet(PagesList.Objects[i]).Dispose;
         except
            messageDlg(format('Interal error $d: can''t free memory.[%d]',[integer(PagesList.Objects[i])]),mtError,[mbok],0)
         end;
@@ -1380,6 +1418,9 @@ var
    silent,compile,run:boolean;
    filename:string;
 begin
+    BuildMode(Launcher.ideMode);
+    if Main.Height<=150 then Main.Height:=screen.WorkAreaHeight-Main.Top;
+
     Launcher.Compiler.Main:=Handle;
     Launcher.Lib.OnScan:=Scan;
     Launcher.PaletteClasses:=PanelPalette;
@@ -1391,11 +1432,7 @@ begin
     tbOpen.DropdownMenu:=Launcher.MRUFilesMenu;
     tbCompileRun.DropdownMenu:=Launcher.MRUExesMenu;
 
-    //LoadExtensions;
-
     ActiveResult.Edit.Lines.Add('OK - IDE show...');
-
-    
 
     Splash.Close ;
 
@@ -1437,15 +1474,14 @@ begin
 
     Launcher.Lib.MainType:=Launcher.TypeExists(Launcher.Lib.MainTypeName);
 
+    try LoadExtensions; except end;
 end;
 
 procedure TMain.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
    CheckRunning;
    Launcher.Write ;
-   UnloadExtensions;
-   if CheckFiles=mrCancel then Abort;
-   Scripter.Free;
+   if CheckFiles=mrCancel then Action:=caNone;
 end;
 
 procedure TMain.CheckRunning;
@@ -1647,12 +1683,13 @@ begin
        if TDialog(ActiveObject).Page<>nil then
           for i:=TDialog(ActiveObject).ELDesigner.SelectedControls.Count-1 downto 0 do begin
               C:=TContainer(TDialog(ActiveObject).ELDesigner.SelectedControls.Items[i]);
-              if C<>nil then
+              if C<>nil then begin
+                 if C.Node<>nil then C.Node.Free;
                  TPageSheet(TDialog(ActiveObject).Page).DeleteControl(C);
+              end
           end;
           TDialog(ActiveObject).ELDesigner.Cut ;
           TPageSheet(TDialog(ActiveObject).Page).Scanner.Execute;
-          //ObjectsTree.UpdateItems;
     end
 end;
 
@@ -1667,11 +1704,11 @@ begin
               C:=TContainer(TDialog(ActiveObject).ELDesigner.SelectedControls.Items[i]);
               if C<>nil then begin
                  C.Typ:=TType(C.Tag);
+                 ObjectsTree.AddObject(C.Typ);
                  TPageSheet(TDialog(ActiveObject).Page).InsertControl(C);
               end
           end;
        TPageSheet(TDialog(ActiveObject).Page).Scanner.Execute;
-       //ObjectsTree.UpdateItems;
 end;
 
 procedure TMain.UndoObjects;
@@ -1679,7 +1716,11 @@ begin
 end;
 
 procedure TMain.DeleteObjects;
+var
+   i:integer;
 begin
+   for i:=0 to ActiveDialog.ELDesigner.SelectedControls.Count-1 do
+       ObjectsTree.DeleteObject(TContainer(ActiveDialog.ELDesigner.SelectedControls[i]).Typ);
    ActiveDialog.ELDesigner.DeleteSelectedControls;
 end;
 
@@ -1888,15 +1929,15 @@ begin
       if ActiveObject.InheritsFrom(TDialog) then begin
         menuUndo.Enabled:=false;
         menuRedo.Enabled:=false;
-        menuPaste.Enabled:=ActiveDialog.ELDesigner.CanPaste;
-        menuCut.Enabled:=ActiveDialog.ELDesigner.CanCut;
-        menuCopy.Enabled:=ActiveDialog.ELDesigner.CanCopy;
-        menuDelete.Enabled:=ActiveDialog.ELDesigner.SelectedControls.Count>0;
-        menuSelectAll.Enabled:=ActiveDialog.ControlCount>0;
+        menuPaste.Enabled:=TDialog(ActiveObject).ELDesigner.CanPaste;
+        menuCut.Enabled:=TDialog(ActiveObject).ELDesigner.CanCut;
+        menuCopy.Enabled:=TDialog(ActiveObject).ELDesigner.CanCopy;
+        menuDelete.Enabled:=TDialog(ActiveObject).ELDesigner.SelectedControls.Count>0;
+        menuSelectAll.Enabled:=TDialog(ActiveObject).ControlCount>0;
         menuBlock.Enabled:=true;
-        menuComment.Enabled:=ActiveDialog.ELDesigner.CanCopy;
+        menuComment.Enabled:=TDialog(ActiveObject).ELDesigner.CanCopy;
         menuUncomment.Enabled:=menuComment.Enabled;
-        menuProperties.Enabled:=ActiveDialog<>nil;
+        menuProperties.Enabled:=TDialog(ActiveObject)<>nil;
     end else
     if ActiveObject.InheritsFrom(TPageSheet) then begin
         menuUndo.Enabled:=ActiveEditor.Frame.Edit.CanUndo;
@@ -1907,7 +1948,7 @@ begin
         menuDelete.Enabled:=ActiveEditor.Frame.Edit.SelText<>'';
         menuSelectAll.Enabled:=ActiveEditor.Frame.Edit.Text<>'';
         menuBlock.Enabled:=true;
-        menuComment.Enabled:=pos('''',ActiveEditor.Frame.Edit.SelText)=0;
+        menuComment.Enabled:=(pos('''',ActiveEditor.Frame.Edit.SelText)=0) or (pos ('''',ActiveEditor.Frame.Edit.SelText)>1);
         menuUncomment.Enabled:=pos('''',ActiveEditor.Frame.Edit.SelText)>0;
         menuProperties.Enabled:=ActiveEditor<>nil;
     end
@@ -2156,12 +2197,12 @@ end;
 
 procedure TMain.PopupMenuDesignerPopup(Sender: TObject);
 begin
-    menuMenuEditor.Enabled:=(ActiveDialog<>nil) and (ActiveDialog.ELDesigner.SelectedControls.DefaultControl.InheritsFrom(TDialog));
+    {menuMenuEditor.Enabled:=(ActiveDialog<>nil) and (ActiveDialog.ELDesigner.SelectedControls.Count>0);
     menuEditDsgnr.Enabled:=(ActiveDialog<>nil) and (ActiveDialog.ELDesigner.SelectedControls.DefaultControl.InheritsFrom(TContainer));
     menuAlign.Enabled:=(ActiveDialog<>nil) and (ActiveDialog.ELDesigner.DesignControl.InheritsFrom(TContainer));
     menuTabOrder.Enabled:=(ActiveDialog<>nil) and (ActiveDialog.ELDesigner.SelectedControls.DefaultControl.InheritsFrom(TDialog));
     menuCreationOrder.Enabled:=(ActiveDialog<>nil) and (ActiveDialog.ELDesigner.SelectedControls.DefaultControl.InheritsFrom(TDialog));
-    menuAcceptChilds.Checked:=TContainer(ActiveDialog.ELDesigner.SelectedControls.DefaultControl).AcceptChilds
+    menuAcceptChilds.Checked:=TContainer(ActiveDialog.ELDesigner.SelectedControls.DefaultControl).AcceptChilds}
 end;
 
 procedure TMain.FormShortCut(var Msg: TWMKey; var Handled: Boolean);
@@ -2263,11 +2304,41 @@ begin
    ;
 end;
 
+procedure TMain.FormDestroy(Sender: TObject);
+begin
+   Scripter.Free;
+   //try UnloadExtensions; except messageDlg('Can''t unload extensions.',mtInformation,[mbok],0); end;
+   //try FreeModules; except messageDlg('Can''t unload modules.',mtInformation,[mbok],0); end;
+end;
+
+procedure TMain.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+begin
+   //
+end;
+
+procedure TMain.menuVBClick(Sender: TObject);
+begin
+   Launcher.ideMode:=mdVB;
+   BuildMode(Launcher.ideMode);
+end;
+
+procedure TMain.menuDelphiClick(Sender: TObject);
+begin
+   Launcher.ideMode:=mdDelphi;
+   BuildMode(Launcher.ideMode);
+end;
+
+procedure TMain.menuAboutClick(Sender: TObject);
+begin
+   menuVB.Checked:=Launcher.ideMode=mdVB;
+end;
+
 initialization
    registerClasses([TResourceExport]);
    ideDir:=ExtractFilePath(ParamStr(0));
    workDir:=ideDir;
    BridgeFile:=ideDir+'gui\gui.bas';
+   DllModules:=TStringList.Create;
    Resources:=TResources.create;
    Debugger:=TDebugger.create;
    Launcher:=TLauncher.Create;
@@ -2279,6 +2350,7 @@ initialization
    if not DirectoryExists(ideDir+'gui') then
       ExtractGUI;
 finalization
+   DllModules.Free;
    Launcher.Free;
    Resources.Free;
    Debugger.Free;

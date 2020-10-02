@@ -1,24 +1,14 @@
 unit DialogUnit;
-
-{$IFDEF FPC}
-  {$MODE Delphi}
-{$ENDIF}
-
 interface
 
 uses
-{$IFnDEF FPC}
   Windows,
-{$ELSE}
-  LCLIntf, LCLType, LMessages,
-{$ENDIF}
   Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms, Menus,
   Dialogs, ELDsgnr, ComCtrls, TypInfo, TypesUnit, FreeBasicRTTI;
 
 type
   TDialog = class(TForm)
     ELDesigner: TELDesigner;
-    procedure FormActivate(Sender: TObject);
     procedure FormShow(Sender: TObject);
     procedure ELDesignerChangeSelection(Sender: TObject);
     procedure ELDesignerControlHint(Sender: TObject; AControl: TControl;
@@ -48,13 +38,15 @@ type
     procedure MenuItemClick(Sender:TObject);
     procedure SetName(const v:TComponentName);override;
     procedure WMMoved(var m:TWMMove);message wm_move;
+    procedure WMActivate(var m:TWMActivate);message wm_activate;
   public
     { Public declarations }
-    Extends,Hosted:string;
-    AssignedItems:TStrings;
+    AssignedItems,AssignedEvents:TStrings;
+    Sheet:TTabSheet;
     constructor Create(AOwner:TComponent); override;
     destructor Destroy; override;
     procedure BuildMenu;
+    procedure ActivateDialog;
     procedure ReadPage;
     procedure DeleteObjects;
     procedure Comment(C:TControl);
@@ -83,11 +75,15 @@ constructor TDialog.Create(AOwner:TComponent);
 begin
     inherited;
     AssignedItems:=TStringList.Create;
-    if Launcher.Lib.TypExists(Launcher.Lib.MainTypeName)<>nil then
-       Extends:=Launcher.Lib.MainTypeName
-    else
-       Extends:='QForm';
-    Hosted:=NamesList.AddName(Extends);
+    AssignedEvents:=TStringList.Create;
+    fTyp:=TType.create;
+    fTyp.Extends:=Launcher.Lib.MainTypeName;
+    
+    if fTyp.Extends='' then fTyp.Extends:='QForm';
+    fTyp.ExtendsType:=Launcher.TypeExists(fTyp.Extends);
+
+    fTyp.Hosted:=NamesList.AddName(fTyp.Extends);
+    
     ActiveDialog:=Self;
     ActiveObject:=ActiveDialog;
     fMenuItem:=TMenuItem.Create(Self);
@@ -100,24 +96,35 @@ begin
     except end;
     oldName:=Name;
     Inspector.Properties.Designer:=ELDesigner;
-    RTTIGetProperties(Extends,Inspector.Filter,'public');
+    RTTIGetProperties(Typ.Extends,Inspector.Filter,'public');
     fMenuItem.Tag:=integer(Self);
     if DialogsList.IndexOfObject(self)=-1 then
        DialogsList.AddObject(Name,Self);
     if fPage<>nil then
-       if TPageSheet(fPage).Scanner.TypExists(Hosted)<>nil then
-          Typ:=TPageSheet(fPage).Scanner.TypExists(Hosted);
+       if TPageSheet(fPage).Scanner.TypExists(Typ.Hosted)<>nil then
+          Typ:=TPageSheet(fPage).Scanner.TypExists(Typ.Hosted);
     ObjectsTree.Dialog:=self;      
 end;
 
 destructor TDialog.Destroy;
 begin
     AssignedItems.Free;
+    AssignedEvents.Free;
     fMenuItem.Free;
     if fPage<>nil then fPage:=nil;
     if DialogsList.IndexOfObject(self)>-1 then
        DialogsList.Delete(DialogsList.IndexOfObject(self));
+    if fNode<>nil then fNode.Free;
+    if fPage<>nil then TPageSheet(fPage).Dialog:=nil;
+    if ActiveObject=Self then ActiveObject:=nil;
+    if ActiveDialog=Self then ActiveDialog:=nil;  
     inherited;
+end;
+
+procedure TDialog.WMActivate(var m:TWMActivate);
+begin
+   inherited;
+   if m.ActiveWindow=Handle then ActivateDialog;
 end;
 
 procedure TDialog.SetPage(v:TTabSheet);
@@ -132,12 +139,13 @@ var
    SaveState:boolean;
    i:integer;
 begin
-   inherited; 
+   inherited;
    if fPage<>nil then begin
       SaveState:=TPageSheet(fPage).Saved;
       fPage.Name:=Name;
       fPage.Caption:=Name;
       TPageSheet(fPage).Saved:=SaveState;
+      if Sheet<>nil then Sheet.Caption:=Caption;
    end;
    if fMenuItem<>nil then fMenuItem.Caption:=Name;
    if fNode<>nil then fNode.Text:=Name;
@@ -162,8 +170,8 @@ begin
     ftyp:=v;
     if v<>nil then begin
       Tag:=integer(ftyp);
-      Hosted:=v.Hosted;
-      Extends:=v.Extends;
+      Typ.Hosted:=v.Hosted;
+      Typ.Extends:=v.Extends;
       if width=0 then width:=v.cx;
       if height=0 then height:=v.cy;
       RTTIGetProperties(v.Hosted,inspector.Filter,'public');
@@ -247,7 +255,7 @@ var
    v,f:TField;
    C:array of TContainer;
    tk,p,u,sv:string;
-   L:TStrings;
+   L,Types{}:TStrings;
    pif:PPropInfo;
    function GetContainer(v:string):TContainer;
    var
@@ -261,6 +269,7 @@ var
            end
    end;
 begin
+    Types:=nil;
     if fPage=nil then exit;
     s:=TPageSheet(fPage).Scanner;
     if s<>nil then s.Scan;
@@ -268,13 +277,21 @@ begin
     if s.Types.Count>0 then
     for i:=0 to s.Types.Count-1 do begin
         t:=s.Typ[i];
-        if Hosted=t.Hosted then begin  
+        if Typ.Hosted=t.Hosted then begin  
            typ:=T;
            for j:=0 to typ.FieldCount-1 do begin
                v:=typ.Field[j];
-               x:=Launcher.Lib.Types.IndexOf(v.Return); 
-               if x>-1 then begin 
-                  cls:=TType(Launcher.Lib.Types.Objects[x]);
+               x:=Launcher.Lib.Types.IndexOf(v.Return);
+               
+               if x=-1 then begin
+                  if Launcher.ReadUnregisterClass then begin
+                     x:=Launcher.Types.IndexOf(v.Return);
+                     Types:=Launcher.Types
+                  end   
+               end else Types:=Launcher.Lib.Types;
+
+               if x>-1 then begin
+                  if Types<>nil then cls:=TType(Types.Objects[x]);
                   f:=cls.FieldExists('constructor '+cls.Hosted);
 
                   if f<>nil then begin
@@ -368,13 +385,13 @@ begin
        end;
     end;
 
-    {for i:=0 to TPageSheet(fPage).Frame.Edit.Lines.Count-1 do begin
+    for i:=0 to TPageSheet(fPage).Frame.Edit.Lines.Count-1 do begin
         tk:=TPageSheet(fPage).Frame.Edit.Lines[i];
         if pos('.',tk)>0 then begin
            tk:=trim(copy(tk,1,pos('.',tk)-1));
-           TPageSheet(fpage).Frame.Edit.Lines.Objects[i]:=GetContainer(tk); 
+           TPageSheet(fpage).Frame.Edit.Lines.Objects[i]:=GetContainer(tk);
         end
-    end ; }
+    end ; {}
 
     for i:=0 to TPageSheet(fPage).Frame.Edit.Lines.Count-1 do begin
         tk:=TPageSheet(fPage).Frame.Edit.Lines[i];
@@ -441,12 +458,15 @@ begin
     BringToFront;
 end;
 
-procedure TDialog.FormActivate(Sender: TObject);
+procedure TDialog.ActivateDialog;
 begin
     ObjectsTree.AddObject(Self);
     Inspector.Dialog:=self;
-    Inspector.ReadEvents(Typ);
+    if typ<>nil then
+       Inspector.ReadEvents(Typ);   {}
     Main.UpdateToolBars;
+    ActiveDialog:=self;
+    ActiveObject:=ActiveDialog
 end;
 
 procedure TDialog.FormShow(Sender: TObject);
@@ -477,7 +497,7 @@ begin
         Inspector.Properties.Add(ELDesigner.SelectedControls.Items[i]);
         Inspector.ObjectsBox.ItemIndex:=Inspector.ObjectsBox.Items.IndexOfObject(ELDesigner.SelectedControls.Items[i]);
         ObjectsTree.TreeView.Selected:=ObjectsTree.Find(ELDesigner.SelectedControls.Items[i]);
-        ELDesigner.SelectedControls.Items[i].Refresh; 
+        ELDesigner.SelectedControls.Items[i].Refresh;
         if ELDesigner.SelectedControls.Items[i].InheritsFrom(TDialog) then
            T:=TDialog(ELDesigner.SelectedControls.Items[i]).Typ else
         if ELDesigner.SelectedControls.Items[i].InheritsFrom(TContainer) then
@@ -517,7 +537,7 @@ begin
     except
       Launcher.ResetPalette
     end;
-    ELDesigner.SelectedControls.DefaultControl.Invalidate;
+    if ELDesigner.SelectedControls.Count>0 then  ELDesigner.SelectedControls.DefaultControl.Invalidate;
     ELDesigner.DesignControl.Invalidate;
     if fPage<>nil then begin
        ActiveEditor:=TPageSheet(fPage);

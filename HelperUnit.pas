@@ -138,7 +138,8 @@ type
 
   function GetUserName: String;
   function ComputerName:String;
-
+  function SkipBlanks(v:string):string;
+  
 const
     RT_HTML = MAKEINTRESOURCE(23);
     RT_MANIFEST = MAKEINTRESOURCE(24);
@@ -226,6 +227,22 @@ var
 implementation
 
 function FlashWindowEx; external user32 Name 'FlashWindowEx';
+
+function SkipBlanks(v:string):string;
+   var
+      i:integer;
+      L:TStrings;
+   begin
+       result:=v;
+       if v='' then exit;
+       L:=TStringList.Create;
+       L.Text:=stringreplace(v,#32,#10,[rfreplaceall]);
+       result:='';
+       for i:=0 to L.Count-1 do
+           if L[i]<>'' then
+              result:=trim(result+#32+L[i]);
+       L.Free
+   end;
 
 function getUserName: String;
 const

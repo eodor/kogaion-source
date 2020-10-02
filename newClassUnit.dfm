@@ -1,6 +1,6 @@
 object NewClass: TNewClass
-  Left = 302
-  Top = 151
+  Left = 258
+  Top = 128
   BorderStyle = bsDialog
   Caption = 'New Class'
   ClientHeight = 353
@@ -17,35 +17,35 @@ object NewClass: TNewClass
   TextHeight = 16
   object LabelClassOrDLL: TLabel
     Left = 15
-    Top = 22
+    Top = 10
     Width = 129
     Height = 16
     Caption = 'ClassName or DLL file:'
   end
   object LabelPalette: TLabel
     Left = 15
-    Top = 51
+    Top = 39
     Width = 48
     Height = 16
     Caption = '&Palette :'
   end
   object LabelAncestor: TLabel
     Left = 16
-    Top = 80
+    Top = 68
     Width = 55
     Height = 16
     Caption = '&Ancestor:'
   end
   object EditClassName: TEdit
     Left = 162
-    Top = 22
+    Top = 10
     Width = 304
-    Height = 22
+    Height = 24
     TabOrder = 0
   end
   object btnDLLFile: TButton
     Left = 473
-    Top = 22
+    Top = 10
     Width = 30
     Height = 26
     Caption = '-'
@@ -54,9 +54,9 @@ object NewClass: TNewClass
   end
   object ListBox: TListBox
     Left = 15
-    Top = 120
+    Top = 100
     Width = 489
-    Height = 177
+    Height = 201
     ItemHeight = 16
     PopupMenu = PopupMenu
     TabOrder = 2
@@ -83,7 +83,7 @@ object NewClass: TNewClass
   end
   object ComboBoxPalette: TComboBox
     Left = 162
-    Top = 51
+    Top = 39
     Width = 245
     Height = 24
     ItemHeight = 16
@@ -92,7 +92,7 @@ object NewClass: TNewClass
   end
   object cbxAncestor: TComboBox
     Left = 160
-    Top = 80
+    Top = 68
     Width = 249
     Height = 24
     ItemHeight = 16

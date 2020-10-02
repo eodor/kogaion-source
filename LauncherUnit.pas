@@ -6,7 +6,8 @@ uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, Menus, ImgList, XPMan, ComCtrls, ToolWin, ExtCtrls, PageSheetUnit,
   DialogUnit, TypesUnit, CompilerUnit, IniFiles, ELDsgnr, SynEdit, SynEditTypes,
-  SynEditMiscClasses, SynEditOptionsDialog, TypInfo, DesignIntf, Buttons, StrUtils ;
+  SynEditMiscClasses, SynEditOptionsDialog, TypInfo, DesignIntf, Buttons, StrUtils,
+  DialogSheetUnit ;
 
 type
    TLauncher=class;
@@ -54,7 +55,7 @@ type
 
    TLauncher=class(TStringList)
    private
-     fIdeMode:TIdeMode;
+     fideMode:TIDEMode;
      fTheme:integer;
      fApplication:TApp;
      fMRUFilesMenu,fMRUExesMenu:TPopupMenu;
@@ -82,7 +83,7 @@ type
      procedure SetClassPalettes(v:TClassRegPages);
      procedure SetTarget(v:string);
    protected
-     procedure SetMode(v:TIdeMode);
+     procedure SetMode(v:TIDEMode);
      procedure SetTheme(v:integer);
      procedure ButtonClick(Sender:TObject);
      procedure MRUExeClick(Sender:TObject);
@@ -94,7 +95,9 @@ type
      MinimizeOnRun,DisableOnRun, ResourcesEmbed,
      RunSeparateThread, RunDebugger, Conjoin,
      AllowMultipleFileInstances ,DataBaseOnLoad,
-     TerminateOnExit,ReadScripts, onlyOneError :boolean;
+     TerminateOnExit,ReadScripts, onlyOneError,
+     ReadUnregisterClass,AlowPlugins:boolean;
+     ideMode:TIDEMode;
      procedure LoadOptionsContainer;
      procedure SaveOptionsContainer;
      procedure LoadClasses;
@@ -484,7 +487,7 @@ begin
       messageDlg(format('The %s library are not Multiplatform one.',[flib.FileName]),mtInformation,[mbok],0);
 end;
 
-procedure TLauncher.SetMode(v:TIdeMode);
+procedure TLauncher.SetMode(v:TIDEMode);
 begin
     fideMode:=v;
     BuildMode(v);
@@ -561,6 +564,7 @@ function TLauncher.NewDialog(v:string=''):TDialog;
 var
    i:integer;
    P:TPageSheet;
+   D:TDialogSheet;
 begin
    P:=NewEditor(v);
    P.HasDialog:=true;
@@ -576,7 +580,14 @@ begin
    end ;
    result.Page.Name:=result.name;
    result.Page.Caption:=result.name;
-   //result.Caption:=result.Name;
+   if Launcher.ideMode=mdVB then begin
+      D:=TDialogSheet.Create(nil);
+      D.Align:=alClient;
+      D.PageControl:=Code.PageControl;
+      D.Dialog:=result;
+      result.Sheet:=D;
+      Windows.SetParent(result.Handle,D.Handle)
+   end;
    ActiveDialog:=result;
    ActiveObject:=ActiveDialog  ;
    ObjectsTree.Dialog:=result
@@ -705,6 +716,7 @@ var
    Pif:PPropInfo;
    s:string;
    Ri:TResourceItem;
+   MDll:TDllModule;
 begin
     if FileExists(f) then
        fini:=f
@@ -732,6 +744,17 @@ begin
              end
          end;
 
+         DllModules.Text:=StringReplace(ReadString('Launcher','Modules',''),',',#10,[rfreplaceall]);
+         for i:=0 to DllModules.Count-1 do begin
+             s:=ReadString(DllModules[i],'FileName','');
+             if FileExists(s) then begin
+                MDll:=TDllModule.Create;
+                MDll.Handle:=LoadLibrary(PChar(s));
+                MDll.FileName:=s;
+                DllModules.Objects[i]:=MDll;
+             end
+         end ;
+
          s:=StringReplace(ReadString('Launcher','Classes',''),',',#10,[rfreplaceall]);
          L.Text:=s;
          if L.Count>0 then
@@ -743,9 +766,9 @@ begin
          ReadSection('ClassFiles',fClassFiles);
 
          ReadSection('IncPaths',Settings.ListBoxDirs.Items);
-         Compiler.Switch:='-i ';
+         Compiler.Switch:='';
          for i:=0 to Settings.ListBoxDirs.Items.Count-1 do
-             Compiler.Switch:=Compiler.Switch+format(' "%s"',[Settings.ListBoxDirs.Items[i]]);
+             Compiler.Switch:=Compiler.Switch+format(' -i "%s"',[Settings.ListBoxDirs.Items[i]]);
 
          ReadSection('MRUFiles',L);
          for i:=0 to L.Count-1 do
@@ -761,6 +784,7 @@ begin
          fEditOptions.Font.Name:=ReadString('Edit','Font.Name','Lucida Console');
          fEditOptions.Font.Size:=ReadInteger('Edit','Font.Size',10);
 
+         readUnregisterClass:=ReadBool('Launcher','readUnregisterClass',true);
          onlyOneError:=ReadBool('Launcher','onlyOneError',false);
          ReadScripts:=ReadBool('Launcher','ReadScripts',false);
          AlowCompletion:=ReadBool('Launcher','Completion',true);
@@ -775,6 +799,8 @@ begin
          EditIsGlobal:=ReadBool('Launcher','EditIsGlobal',false);
          DesignerIsGlobal:=ReadBool('Launcher','DesignerIsGlobal',false);
          ResourcesEmbed:=ReadBool('Launcher','ResourceEmbed',false);
+         AlowPlugins:=ReadBool('Launcher','AlowPlugins',false);
+         IDEMode:=TIDEMode(ReadInteger('Launcher','IDEMode',integer(mdDelphi)));
          fDesigner.Grid.Visible:=ReadBool('Designer','GridVisible',true);
          fDesigner.Grid.XStep:=ReadInteger('Designer','GridXStep',4);
          fDesigner.Grid.YStep:=ReadInteger('Designer','GridYStep',4);
@@ -878,6 +904,7 @@ begin
          WriteString('Edit','Font.Name', fEditOptions.Font.Name);
          WriteInteger('Edit','Font.Size',fEditOptions.Font.Size);
 
+         WriteBool('Launcher','readUnregisterClass',readUnregisterClass);
          WriteBool('Launcher','Completion',AlowCompletion);
          WriteBool('Launcher','OnlyOneError',OnlyOneError);
          WriteBool('Launcher','ReadaScripts',ReadScripts);
@@ -893,6 +920,8 @@ begin
          WriteBool('Launcher','EditIsGlobal',EditIsGlobal);
          WriteBool('Launcher','DesignerIsGlobal',DesignerIsGlobal);
          WriteBool('Launcher','ResourceEmbed',ResourcesEmbed);
+         WriteBool('Launcher','AlowPlugins',AlowPlugins);
+         WriteInteger('Launcher','IDEMode',integer(Mode));
          if ActiveLang<>nil then
             WriteString('Launcher','Language',ActiveLang.FileName);
          WriteBool('Designer','GridVisible',fDesigner.Grid.Visible);
@@ -926,19 +955,32 @@ begin
              WriteString('MRUFiles',fMRUFiles[i],format('%d',[i]));
          for i:=0 to  fMRUExes.Count-1 do
              WriteString('MRUExes',fMRUExes[i],format('%d',[i]));
-         WriteString('Project','exeext',ActiveProject.ExeExt);
-         WriteString('Project','defname',ActiveProject.DefName);
-         WriteString('Project','defvalue',ActiveProject.DefName);
-         WriteBool('Project','debug',ActiveProject.Debug);
-         WriteBool('Project','debuginfo',ActiveProject.DebugInfo);
-         WriteBool('Project','compileonly',ActiveProject.CompileOnly);
-         WriteBool('Project','preserveo',ActiveProject.PreserveO);
-         WriteBool('Project','addglobaldef',ActiveProject.AddGlobalDef);
-         WriteBool('Project','errorcheck',ActiveProject.ErrorCheck);
-         WriteBool('Project','fbdebug',ActiveProject.FBDebug);
-         WriteBool('Project','resumeerror',ActiveProject.ResumeError);
-         WriteBool('Project','nullptrcheck',ActiveProject.NullPtrCheck);
-         WriteBool('Project','arraycheck',ActiveProject.ArrayCheck);
+         if ActiveProject<>nil then begin
+            WriteString('Project','exeext',ActiveProject.ExeExt);
+            WriteString('Project','defname',ActiveProject.DefName);
+            WriteString('Project','defvalue',ActiveProject.DefName);
+            WriteBool('Project','debug',ActiveProject.Debug);
+            WriteBool('Project','debuginfo',ActiveProject.DebugInfo);
+            WriteBool('Project','compileonly',ActiveProject.CompileOnly);
+            WriteBool('Project','preserveo',ActiveProject.PreserveO);
+            WriteBool('Project','addglobaldef',ActiveProject.AddGlobalDef);
+            WriteBool('Project','errorcheck',ActiveProject.ErrorCheck);
+            WriteBool('Project','fbdebug',ActiveProject.FBDebug);
+            WriteBool('Project','resumeerror',ActiveProject.ResumeError);
+            WriteBool('Project','nullptrcheck',ActiveProject.NullPtrCheck);
+            WriteBool('Project','arraycheck',ActiveProject.ArrayCheck);
+         end;
+         DeleteKey('Launcher','Modules'); s:='';
+             for j:=0 to DllModules.Count-1 do begin
+                 if j<DllModules.Count-1 then
+                    s:=s+DllModules[j]+','
+                 else
+                    s:=s+DllModules[j];
+                 if DllModules.Objects[j]<>nil then begin
+                    WriteString(DllModules[j],'FileName',TDllModule(DllModules.Objects[j]).FileName);
+                 end
+             end;
+             WriteString('Launcher','Modules',s);
          Free;
     end; SaveOptionsContainer;
 end;
@@ -1043,7 +1085,8 @@ begin
                              TPageSheet(ActiveProject.Files.Objects[i]).Save
                           else
                              TPageSheet(ActiveProject.Files.Objects[i]).SaveAs;
-                   mrno,mrabort: abort;
+                   mrno:exit;
+                   mrabort: abort;
                end
             end;
        end;

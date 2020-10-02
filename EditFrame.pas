@@ -1,17 +1,9 @@
 unit EditFrame;
 
-{$IFDEF FPC}
-  {$MODE Delphi}
-{$ENDIF}
-
 interface
 
 uses
-{$IFnDEF FPC}
   Windows,
-{$ELSE}
-  LCLIntf, LCLType, LMessages,
-{$ENDIF}
   Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,ComCtrls,
   Dialogs, SynEdit, ELSuperEdit, SynExportHTML, SynEditExport,
   SynExportRTF, SynHighlighterURI, SynHighlighterRC, SynCompletionProposal,
@@ -98,7 +90,7 @@ implementation
 {$R *.dfm}
 
 uses PageSheetUnit, ContainerUnit, DialogUnit, MainUnit, LauncherUnit,
-  CodeUnit, TypesUnit,FreeBasicRTTI;
+  CodeUnit, TypesUnit,FreeBasicRTTI, HelperUnit;
 
 procedure TEditor.EditChange(Sender: TObject);
 begin
@@ -117,36 +109,12 @@ begin
        if c.InheritsFrom(TContainer) then
           Hint:=format('object:%d, class: %s',[integer(c),TContainer(c).hosted])
        else
-       if c.InheritsFrom(TDialog) then
-          Hint:=format('object:%d, class: %s',[integer(c),TDialog(c).hosted]);
+       if c.InheritsFrom(TDialog) then begin
+          Hint:=format('object:%d, class: %s',[integer(c),TDialog(c).Typ.hosted]);
+          TDialog(c).BringToFront
+       end
     end else Hint:='';
 
-    if Mark=nil then begin
-       E:=TError.Create;
-       E.Line:=Line;
-       E.Kind:=erkUser;
-       Edit.AddError(E);
-       Edit.BookMarkOptions.BookmarkImages:=BookmarkImageList;
-       Edit.BookMarkOptions.GlyphsVisible:=true;
-       Mark:=TSynEditMark.Create;
-       Mark.InternalImage:=false;
-       Mark.Line:=Line;
-       Mark.BookmarkNumber:=2;
-       Mark.Visible:=true;
-       Edit.Marks.ClearLine(Line);
-       Edit.Marks.Add(Mark);
-    end else begin
-       E:=Edit.isError(Line);
-       if E<>nil then begin
-         E.Kind:=erkNone;
-         Edit.RemoveError(Line);
-         E.Free;
-       end;
-       
-       Mark.Visible:=false;
-       Edit.Marks.Remove(Mark);
-      
-    end
 end;
 
 procedure TEditor.menuUndoClick(Sender: TObject);
@@ -259,10 +227,10 @@ procedure TEditor.EditDropFiles(Sender: TObject; X, Y: Integer;
 var
    i:integer;
    L:TStrings;
-begin
+begin  
     L:=TStringList.Create;
     for i:=0 to AFiles.Count-1 do begin
-        L.LoadFromFile(AFiles[i]); 
+        L.LoadFromFile(AFiles[i]);
         Edit.Lines.Insert(Edit.CaretY,L.Text);
     end;
     L.Free
@@ -336,7 +304,7 @@ begin
                        if F<>nil then T:=TPageSheet(Parent).Scanner.TypExists(F.Return);
                        if T<>nil then begin
                           //RTTIGetProperties(T.Extends,CompletionProposal.InsertList);
-                          RTTIGetFields(T.Extends,CompletionProposal.InsertList);
+                          RTTIGetFields(T.Extends,TStrings(CompletionProposal.InsertList));
                           onlyPublic;
                           for i:=0 to CompletionProposal.InsertList.Count-1 do begin
                               F:=TField(CompletionProposal.InsertList.Objects[i]);
@@ -374,15 +342,11 @@ begin
     
     if key=vk_return then begin
           if Edit.LineText<>'' then
-             L.Text:=StringReplace(Edit.LineText,#32,#10,[rfreplaceall])
+             L.Text:=SkipBlanks(StringReplace(Edit.LineText,#32,#10,[rfreplaceall]))
           else
              L.Text:='';
           if L.Count=0 then exit;
           i:=0;
-          repeat
-                if L[i]=#10 then L[i]:='';
-                inc(i);
-          until i>L.Count-1;
           if CompareText(L[0],'dim')=0 then
              if CompareText(L[1],'shared')<>0 then begin
                 if CompareText(L[1],'as')=0 then begin

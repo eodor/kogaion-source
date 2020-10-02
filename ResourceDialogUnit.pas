@@ -7,7 +7,7 @@ uses
   Windows,
   Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, HelperUnit, StdCtrls, Buttons, ComCtrls, Grids, TypesUnit,
-  Menus, SynEditHighlighter, SynHighlighterRC, SynEdit;
+  Menus, SynEditHighlighter, SynHighlighterRC, SynEdit, ExtCtrls;
 
 type
   TResourcesDialog = class(TForm)
@@ -27,6 +27,8 @@ type
     TabSource: TTabSheet;
     RCSource: TSynEdit;
     RC: TSynRCSyn;
+    TabView: TTabSheet;
+    ImageEdit: TImage;
     procedure btnLoadClick(Sender: TObject);
     procedure FormShow(Sender: TObject);
     procedure cbKindsChange(Sender: TObject);
@@ -43,6 +45,7 @@ type
     procedure PopupMenuPopup(Sender: TObject);
     procedure btCancelClick(Sender: TObject);
     procedure PageControlChange(Sender: TObject);
+    procedure ListViewDblClick(Sender: TObject);
   private
     { Private declarations }
   public
@@ -59,7 +62,7 @@ implementation
 
 {$R *.dfm}
 
-uses MainUnit;
+uses MainUnit, ProjectPropertiesUnit;
 
 function TResourceSDialog.StrToRes(v:string):string;
 var
@@ -183,10 +186,15 @@ procedure TResourcesDialog.ListViewEdited(Sender: TObject; Item: TListItem;
   var S: String);
 var
    i :integer;
+   Ri:TResourceItem;
 begin
     I := ListView.ItemIndex;
-    if i <> -1 then
-       Resources.Item[i].Name := s;
+    if i <> -1 then begin
+       Ri:=TResourceItem(ListView.Items[i].Data);
+       Ri.Name:=s;
+
+       Resources.Save
+    end
 end;
 
 procedure TResourcesDialog.ListViewClick(Sender: TObject);
@@ -268,6 +276,18 @@ end;
 procedure TResourcesDialog.PageControlChange(Sender: TObject);
 begin
     RCSource.Lines.Assign(Resources);
+end;
+
+procedure TResourcesDialog.ListViewDblClick(Sender: TObject);
+var
+   Ri:TResourceItem;
+begin
+    if ListView.ItemIndex>-1 then begin
+       Ri:=ListView.Items[ListView.ItemIndex].data;
+       if Ri<>nil then
+          if Ri.Kind='ICON' then
+             ImageEdit.Picture.LoadFromFile(Ri.FileName);
+    end
 end;
 
 end.

@@ -191,8 +191,10 @@ end;
 procedure TObjectsTree.TreeViewClick(Sender: TObject);
 begin
     if TreeView.Selected<>nil then
-       if TreeView.Selected.Data<>nil then
+       if TreeView.Selected.Data<>nil then begin
           Inspector.ReadObject(TPersistent(TreeView.Selected.Data));
+          Inspector.ObjectsBox.ItemIndex:=Inspector.ObjectsBox.Items.IndexOfObject(TPersistent(TreeView.Selected.Data))
+       end
 end;
 
 end.

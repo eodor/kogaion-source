@@ -13,7 +13,7 @@ uses
   LCLIntf, LCLType, LMessages,
 {$ENDIF}
   Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, Buttons, TypesUnit, IniFiles, Menus;
+  Dialogs, StdCtrls, Buttons, TypesUnit, IniFiles, Menus, OleRegister;
 
 type
   TTools = class(TForm)
@@ -23,6 +23,8 @@ type
     btAdd: TBitBtn;
     btRemove: TBitBtn;
     btExecute: TBitBtn;
+    BitBtn1: TBitBtn;
+    OleRegister: TOleRegister;
     procedure btAddClick(Sender: TObject);
     procedure btRemoveClick(Sender: TObject);
     procedure btExecuteClick(Sender: TObject);
@@ -30,6 +32,7 @@ type
     procedure FormCreate(Sender: TObject);
     procedure ListBoxClick(Sender: TObject);
     procedure FormShow(Sender: TObject);
+    procedure BitBtn1Click(Sender: TObject);
   private
     { Private declarations }
   public
@@ -186,6 +189,15 @@ end;
 procedure TTools.FormShow(Sender: TObject);
 begin
     ListBox.Items.Assign(ToolsList);
+end;
+
+procedure TTools.BitBtn1Click(Sender: TObject);
+begin
+    OLERegister.FileName:=InputBox('OLE','Type the ole file:','');
+    if FileExists(OLERegister.FileName) then
+       OLERegister.RegisterOLE
+    else
+       ShowMessage('Bad file name. File not exists.');
 end;
 
 initialization

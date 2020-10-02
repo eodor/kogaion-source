@@ -178,6 +178,7 @@ function RTTIGetEvents(n:string;L:TStrings;visibility:string='public'):integer;
        if L.Count>0 then L.Clear;
        B:=TStringList.create;
        typ:=Launcher.TypeExists(n);
+       if typ=nil then exit;
        RTTIGetFields(n,B);
        if B.Count>0 then begin
           for j:=0 to B.Count-1 do begin
@@ -225,12 +226,13 @@ function RTTIInheritFrom(t,v:string):TType;
 var
    typ,ityp:TType;
 begin
-    typ:=Launcher.Lib.TypExists(t);
-    ityp:=Launcher.Lib.TypExists(t);
-    if ityp.Extends=typ.Hosted then begin
-       result:=typ;
+    typ:=Launcher.TypeExists(t);
+    ityp:=Launcher.TypeExists(v);
+    if iTyp=nil then exit;
+    if t=ityp.Extends then begin
+       result:=ityp;
        exit
-    end else result:=RTTIInheritFrom(typ.Extends,t)
+    end else result:=RTTIInheritFrom(t,ityp.Extends)
 end;
 
 end.

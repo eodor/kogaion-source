@@ -14,7 +14,7 @@ type
    TClassRegPage=class;
    TClassRegPages=array of TClassRegPage;
 
-   TLauncherOption=(loDisabeleOnRun,loMinimizeOnRun,loEmbedResources,loEditAreGlobal,loDesignerAreGolbal,loConjoin,loMultipleFilesInstance,loDBScanOnLoad,loTerminateOnExit);
+   TLauncherOption=(loDisableOnRun,loMinimizeOnRun,loEmbedResources,loEditAreGlobal,loDesignerAreGolbal,loConjoin,loMultipleFilesInstance,loDBScanOnLoad,loTerminateOnExit,loAlowPlugins,loIDEMode);
    TLauncherOptions=set of TLauncherOption;
 
    TScannerEvent=procedure(Sender:TObject;v:string) of object;
@@ -22,9 +22,9 @@ type
    TScanCstrEvent=procedure(Sender:TObject;cf,f:TField;v:string) of object;
    TScanRegisterEvent=procedure(Sender:TObject;Line:integer; Tokens:TStrings; page:TClassRegPage) of object;
 
-   TAppKind=(atApi,atRC,atSpecific);
+   TAppKind=(atSpecific,atApi,atRC);
 
-   TIDEMode=(mdDelphi,mdVB,mdClassic);
+   TIDEMode=(mdDelphi,mdVB);
 
    TResources=class;
 
@@ -1028,7 +1028,7 @@ end;
 
 procedure TProject.Read;
 var
-   i,x:integer;
+   i,x,y:integer;
    s,n,icf:string;
 label
    skip;
@@ -1036,12 +1036,12 @@ begin
     if Count=0 then exit;
     i:=0;
     s:='';
-    repeat                  
+    repeat
           s:=trim(self[i]);
-          if pos('''',s)=1 then goto skip;
+         if pos('''',s)=1 then goto skip;
           if s='' then goto skip;
           if (pos('/''',s)>0) and (pos('''/',s)=0) then begin
-             s:=copy(s,1,pos('/''',s)-1); 
+             s:=copy(s,1,pos('/''',s)-1);
              repeat
                   if pos('''/',s)>0 then begin
                      inc(i);
@@ -1051,36 +1051,36 @@ begin
                   s:=trim(self[i]);
                   inc(i);
              until (i>Count-1);
-          end; 
+          end;  
 
-          if pos('#define ',lowercase(Text))>0 then begin
-             i:=pos('isproject',lowercase(Text));
-             if i>0 then begin
-                x:=posex(' ',Text,i+9);
-                s:=copy(Text,i+9,x-(i+9));
-                Name:=s; showmessage('is '+s);
+          if pos('#define ',lowercase(s))>0 then begin
+             y:=pos('isproject',lowercase(Text));
+             if y>0 then begin
+                x:=posex(' ',Text,y+9);
+                s:=copy(Text,y+9,x-(y+9));
+                Name:=s;
              end ;
-            { i:=pos('compiler',lowercase(Text));
-             if i>0 then begin
-                x:=posex(' ',Text,i+9);
-                s:=copy(Text,i+9,x-(i+9));
+             y:=pos('compyler',lowercase(Text));
+             if y>0 then begin
+                x:=posex(' ',Text,y+9);
+                s:=copy(Text,y+9,x-(y+9));
                 Compiler.FileName:=s;
              end ;
-             i:=pos('switch',lowercase(Text));
-             if i>0 then begin
-                x:=posex(' ',Text,i+6);
-                s:=copy(Text,i+6,x-(i+6));
+             y:=pos('swytch',lowercase(Text));
+             if y>0 then begin
+                x:=posex(' ',Text,y+6);
+                s:=copy(Text,y+6,x-(y+6));
                 Compiler.Switch:=s;
-             end ; 
-             i:=pos('target',lowercase(Text));
-             if i>0 then begin
-                x:=posex(' ',Text,i+6);
-                s:=copy(Text,i+6,x-(i+6));
+             end ;
+             y:=pos('target',lowercase(Text));
+             if y>0 then begin
+                x:=posex(' ',Text,y+6);
+                s:=copy(Text,y+6,x-(y+6));
                 Compiler.Target:=s;
-             end ;}
+             end ;
           end;
 
-          if pos('#include ',lowercase(s))>0 then begin
+          if pos('#include ',lowercase(self[i]))>0 then begin   
              icf:=copy(s,pos('"',s)+1,lastdelimiter('"',s)-pos('"',s)-1);
              if FileExists(icf) then
                 AddPage( icf);

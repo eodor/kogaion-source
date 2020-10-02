@@ -1111,10 +1111,11 @@ end;
 
 procedure TScanner.Execute;
 begin
-   if fEdit<>nil then
+   if fEdit<>nil then begin
       Assign(fEdit.Lines);
-   Scan;
-   FillTree
+      Scan;
+      FillTree
+   end
 end;
 
 function TScanner.TypExists(v:string):TType;

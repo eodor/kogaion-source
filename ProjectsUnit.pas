@@ -82,8 +82,7 @@ uses MainUnit, ContainerUnit, LauncherUnit, CodeUnit,
 
 procedure TProjects.RemovePage(v:string);
 var
-   i,j,k:integer;
-   P:TProject;
+   i:integer;
    Ps:TPageSheet;
    procedure RemoveFromSource;
    var

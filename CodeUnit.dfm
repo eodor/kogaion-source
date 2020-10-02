@@ -1,6 +1,6 @@
 object Code: TCode
-  Left = 341
-  Top = 185
+  Left = 295
+  Top = 152
   Width = 1038
   Height = 562
   Caption = 'Code'
@@ -564,7 +564,7 @@ object Code: TCode
       000000000000}
   end
   object PopupMenuTree: TPopupMenu
-    Left = 72
+    Left = 76
     Top = 88
     object menuFontTree: TMenuItem
       Caption = '&Font...'

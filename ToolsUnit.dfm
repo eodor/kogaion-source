@@ -2,7 +2,7 @@ object Tools: TTools
   Left = 374
   Top = 198
   Width = 431
-  Height = 252
+  Height = 269
   BorderStyle = bsSizeToolWin
   Caption = 'Tools'
   Color = clBtnFace
@@ -17,14 +17,14 @@ object Tools: TTools
   OnShow = FormShow
   DesignSize = (
     413
-    207)
+    224)
   PixelsPerInch = 115
   TextHeight = 16
   object ListBox: TListBox
     Left = 7
     Top = 7
     Width = 290
-    Height = 130
+    Height = 147
     Anchors = [akLeft, akTop, akRight, akBottom]
     ItemHeight = 16
     TabOrder = 0
@@ -32,7 +32,7 @@ object Tools: TTools
   end
   object EditParams: TEdit
     Left = 7
-    Top = 149
+    Top = 166
     Width = 394
     Height = 24
     Anchors = [akLeft, akRight, akBottom]
@@ -40,7 +40,7 @@ object Tools: TTools
   end
   object cbxShowMenu: TCheckBox
     Left = 7
-    Top = 181
+    Top = 197
     Width = 179
     Height = 21
     Anchors = [akLeft]
@@ -77,5 +77,19 @@ object Tools: TTools
     Caption = '&Execute'
     TabOrder = 5
     OnClick = btExecuteClick
+  end
+  object BitBtn1: TBitBtn
+    Left = 311
+    Top = 121
+    Width = 92
+    Height = 31
+    Anchors = [akTop, akRight]
+    Caption = 'OLE &Register'
+    TabOrder = 6
+    OnClick = BitBtn1Click
+  end
+  object OleRegister: TOleRegister
+    Left = 204
+    Top = 100
   end
 end

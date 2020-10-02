@@ -1,6 +1,6 @@
 object Inspector: TInspector
-  Left = 8
-  Top = 316
+  Left = 162
+  Top = 158
   Width = 317
   Height = 373
   BorderStyle = bsSizeToolWin

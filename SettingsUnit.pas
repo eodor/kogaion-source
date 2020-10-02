@@ -6,9 +6,15 @@ uses
   Windows,
   Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, Buttons, ELDsgnr, ComCtrls, ExtCtrls, IniFiles,
-  CompletionDataBase, LauncherUnit, TypesUnit, Clipbrd, HelperUnit;
+  CompletionDataBase, LauncherUnit, TypesUnit, Clipbrd, HelperUnit,
+  Menus, ShellApi;
 
 type
+  TDllModule=class
+  public
+    Handle:hmodule;
+    FileName:string;
+  end;
   TSettings = class(TForm)
     PageControl: TPageControl;
     TabGeneral: TTabSheet;
@@ -59,10 +65,25 @@ type
     cbxShowOnlyOneError: TCheckBox;
     TabSheet1: TTabSheet;
     ListBoxDirs: TListBox;
-    btnAddDir: TBitBtn;
+    btnAddPath: TBitBtn;
     LabelDirs: TLabel;
     btnLibrary: TBitBtn;
     edLibrary: TEdit;
+    cbxReadUnregisterClass: TCheckBox;
+    btnRemovePath: TBitBtn;
+    PopupMenuDirs: TPopupMenu;
+    menuAddPath: TMenuItem;
+    menuRemovePath: TMenuItem;
+    TabModules: TTabSheet;
+    ListBoxDLLs: TListBox;
+    btnAddDLL: TBitBtn;
+    btnRemoveDLLs: TBitBtn;
+    N1: TMenuItem;
+    menuCopyDir: TMenuItem;
+    PopupMenuDLLs: TPopupMenu;
+    menuCopyDLLs: TMenuItem;
+    ListBoxClasses: TListBox;
+    cbxAlowPlugins: TCheckBox;
     procedure FormShow(Sender: TObject);
     procedure btOKClick(Sender: TObject);
     procedure btClearMRUFilesClick(Sender: TObject);
@@ -80,8 +101,19 @@ type
     procedure PanelColorClick(Sender: TObject);
     procedure ImageClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
-    procedure btnAddDirClick(Sender: TObject);
+    procedure btnAddPathClick(Sender: TObject);
     procedure btnLibraryClick(Sender: TObject);
+    procedure btnRemovePathClick(Sender: TObject);
+    procedure ListBoxDirsClick(Sender: TObject);
+    procedure menuAddPathClick(Sender: TObject);
+    procedure menuRemovePathClick(Sender: TObject);
+    procedure ListBoxDirsDblClick(Sender: TObject);
+    procedure menuCopyDirClick(Sender: TObject);
+    procedure btnAddDLLClick(Sender: TObject);
+    procedure btnRemoveDLLsClick(Sender: TObject);
+    procedure menuCopyDLLsClick(Sender: TObject);
+    procedure ListBoxDLLsClick(Sender: TObject);
+    procedure ListBoxDLLsDblClick(Sender: TObject);
   private
     { Private declarations }
     EraseFiles, EraseExes :boolean;
@@ -96,6 +128,8 @@ type
 
 var
   Settings: TSettings;
+  ActiveModule:TDllModule;
+  GetClasses:function :PChar; stdcall;
 
 implementation
 
@@ -116,6 +150,7 @@ var
    L :TStrings;
    ifl:string;
 begin
+   ListBoxDlls.Items.Assign(DLLModules);
    ifl:=ChangeFileExt(ParamStr(0),'.ini');
    with TIniFile.Create(ifl) do begin
         ReadSection('IncPaths',ListBoxDirs.Items);
@@ -129,6 +164,7 @@ begin
    cbxCompilers.Text:=Launcher.Compiler.FileName;
    if cbxCompilers.Items.IndexOf(cbxCompilers.Text)=-1 then
       cbxCompilers.Items.Add(cbxCompilers.Text);
+   cbxReadUnregisterClass.Checked:=Launcher.ReadUnregisterClass;
    cbxShowOnlyOneError.Checked:=Launcher.onlyOneError;
    cbxReadScriptFolder.Checked:=Launcher.ReadScripts;
    cbAlowCompletion.Checked:=Launcher.AlowCompletion;
@@ -150,6 +186,8 @@ begin
    Image.Hint:=Launcher.App.IconPath;
    Image.Picture.LoadFromFile(Image.Hint);
    cbxAppHelpFile.Text:=Launcher.App.Help;
+   cbxAlowPlugins.Checked:=Launcher.AlowPlugins;
+   
    //RadioGroup.ItemIndex:=integer(Launcher.App.Kind);
    L:=TStringList.Create;
    with TIniFile.Create(ifl) do begin
@@ -179,6 +217,8 @@ begin
    Launcher.Compiler.FileName:=cbxCompilers.Text;
    Compiler.FileName:=Launcher.Compiler.FileName;
 
+   Launcher.AlowPlugins:=cbxAlowPlugins.Checked;
+   Launcher.ReadUnregisterClass:=cbxReadUnregisterClass.Checked;
    Launcher.onlyOneError:=cbxShowOnlyOneError.Checked;
    Launcher.ReadScripts:=cbxReadScriptFolder.Checked;
    Launcher.AlowCompletion:=cbAlowCompletion.Checked;
@@ -333,7 +373,6 @@ begin
         WriteString('DBMask',cbxDBMaskFile.Text,cbxDBMaskFile.Text);
         Free;
     end;
-    //CompletionDB.Free;
 end;
 
 procedure TSettings.cbxDBMaskFileKeyDown(Sender: TObject; var Key: Word;
@@ -409,7 +448,7 @@ begin
        edLibrary.Text:=Launcher.Lib.MainFile;
 end;
 
-procedure TSettings.btnAddDirClick(Sender: TObject);
+procedure TSettings.btnAddPathClick(Sender: TObject);
 var
    Dir :string;
 begin
@@ -432,6 +471,114 @@ begin
           end;
    mrno  :exit;
    end
+end;
+
+procedure TSettings.btnRemovePathClick(Sender: TObject);
+begin
+    if ListBoxDirs.ItemIndex>-1 then begin
+       ListBoxDirs.Items.Delete(ListBoxDirs.ItemIndex);
+    end
+end;
+
+procedure TSettings.ListBoxDirsClick(Sender: TObject);
+begin
+    btnRemovePath.Enabled:=ListBoxDirs.ItemIndex>-1;
+end;
+
+procedure TSettings.menuAddPathClick(Sender: TObject);
+begin
+    btnAddPath.Click
+end;
+
+procedure TSettings.menuRemovePathClick(Sender: TObject);
+begin
+    btnRemovePath.Click
+end;
+
+procedure TSettings.ListBoxDirsDblClick(Sender: TObject);
+begin
+    if ListBoxDirs.ItemIndex>-1 then begin
+       ShellExecute(0,'open',PChar(ListBoxDirs.Items[ListBoxDirs.ItemIndex]),'','',sw_show);
+    end
+end;
+
+procedure TSettings.menuCopyDirClick(Sender: TObject);
+begin
+   if ListBoxDirs.ItemIndex>-1 then begin
+      ClipBoard.Open;
+      ClipBoard.AsText:=ListBoxDirs.Items[ListBoxDirs.ItemIndex];
+      ClipBoard.Close
+   end;
+end;
+
+procedure TSettings.btnAddDLLClick(Sender: TObject);
+begin
+    with TOpenDialog.Create(nil) do begin
+         Filter:='Module files (*.dll,*.ocx,*.fbm)|*.dll;*.ocx;*.fbm';
+         if Execute then
+            if DLLModules.IndexOf(FileName)=-1 then begin
+               ActiveModule:=TDllModule.Create;
+               ActiveModule.Handle:=LoadLibrary(PChar(FileName));
+               ActiveModule.FileName:=FileName;
+               DLLModules.AddObject(ChangeFileExt(ExtractFileName(FileName),''),ActiveModule);
+               if ActiveModule.Handle=0 then messageDlg('Loading of module failed.',mtError,[mbok],0);
+            end;
+         Free
+    end;
+    ListBoxDlls.Items.Assign(DLLModules);
+end;
+
+procedure TSettings.btnRemoveDLLsClick(Sender: TObject);
+var
+   i:integer;
+begin
+    i:=ListBoxDLLs.ItemIndex;
+    if i>-1 then begin
+       ListBoxDLLs.Items.Delete(i);
+       DLLModules.Delete(i);
+    end
+end;
+
+procedure TSettings.menuCopyDLLsClick(Sender: TObject);
+begin
+   if ListBoxDlls.ItemIndex>-1 then begin
+      ClipBoard.Open;
+      ClipBoard.AsText:=ListBoxDlls.Items[ListBoxDlls.ItemIndex];
+      ClipBoard.Close
+   end;
+end;
+
+procedure TSettings.ListBoxDLLsClick(Sender: TObject);
+var
+   MDll:TDllModule;
+   i:integer;
+begin
+    btnRemoveDlls.Enabled:=ListBoxDlls.ItemIndex>-1;
+    i:=ListBoxDlls.ItemIndex;
+    if i>-1 then begin
+       MDll:=TDllModule(ListBoxDLLs.Items.Objects[i]);
+       if MDll<>nil then begin
+          GetClasses:=GetProcAddress(MDll.Handle,'GetClasses');
+          if @GetClasses=nil then
+             GetClasses:=GetProcAddress(MDll.Handle,'GETCLASSES@0');
+          if @GetClasses<>nil then begin
+             ListBoxClasses.Items.Text:=GetClasses();;
+             ListBoxClasses.Items.Text:=StringReplace(ListBoxClasses.Items.Text,',',#10,[rfreplaceall]);
+          end   
+       end
+    end
+end;
+
+procedure TSettings.ListBoxDLLsDblClick(Sender: TObject);
+var
+   MDll:TDllModule;
+begin
+    if ListBoxDlls.ItemIndex>-1 then begin
+       MDll:=TDllModule(ListBoxDlls.Items.Objects[ListBoxDlls.ItemIndex]);
+       if Launcher.isPage(ListBoxDlls.Items[ListBoxDlls.ItemIndex])=nil then
+          Launcher.NewEditor(MDll.FileName)
+
+    end
 end;
 
 end.

@@ -66,22 +66,35 @@ uses ContainerUnit, PageSheetUnit, MainUnit, DialogsListUnit;
 
 procedure TInspector.ReadEvents(T:TType);
 var
-   L:TStrings;
+   L,A:TStrings;
    i:integer;
    Li:TListItem;
+label
+   rereadit;
 begin
    ListView.Items.Clear;
    if T=nil then exit;
    if DialogsList.Count=0 then exit;
    L:=TStringList.Create;
+   if T.Hosted<>'' then begin
       RTTIGetEvents(T.Hosted,L);
-      if L.count>0 then
+      if Properties.Objects[0].InheritsFrom(TContainer) then
+         A:=TContainer(Properties.Objects[0]).AssignedEvents
+      else
+         A:=TDialog(Properties.Objects[0]).AssignedEvents;
+      if L.count>0 then begin
+         rereadit:
          for i:=0 to L.Count-1 do begin
              Li:=ListView.Items.Add;
              Li.Caption:=L[i];
              Li.Data:=L.Objects[i];
+             if A<>nil then
+                if A.IndexOf(L[i])>-1 then
+                   Li.Checked:=true else Li.Checked:=false;
          end;
-      L.Free
+       end else begin RTTIGetEvents(T.Extends,L); if L.Count>0 then goto rereadit; end;
+    end;
+    L.Free
 end;
 
 procedure TInspector.Clear;
@@ -129,13 +142,13 @@ var
    i:integer;
 
 begin
-    fDialog:=v;
     Reset;
-    
     if v=nil then exit;
+    if v.Typ=nil then exit;
+    fDialog:=v;
     fPage:=v.Page;
     Properties.Designer:=v.ELDesigner;
-    ObjectsBox.AddItem(format('%s :%s',[v.Name,v.Hosted]),v);
+    ObjectsBox.AddItem(format('%s :%s',[v.Name,v.Typ.Hosted]),v);
     ReadObjects(v);
     if (v<>nil) and (v.ELDesigner<>nil) and (v.ELDesigner.SelectedControls.Count>0) then begin
        i:=ObjectsBox.Items.IndexOfObject(v.ELDesigner.SelectedControls.DefaultControl);
@@ -143,7 +156,6 @@ begin
        Properties.Clear;
        Properties.Add(v.ELDesigner.SelectedControls.DefaultControl);
     end  ;
-    
 end;
 
 procedure TInspector.PropertiesFilterProp(Sender: TObject;
@@ -151,10 +163,12 @@ procedure TInspector.PropertiesFilterProp(Sender: TObject;
 
 begin
     if AInstance.InheritsFrom(TDialog) then
-       RTTIGetProperties(TDialog(AInstance).Hosted,Filter,'public')
+       if TDialog(AInstance).Typ<>nil then
+          RTTIGetProperties(TDialog(AInstance).Typ.Hosted,Filter,'public')
     else
     if AInstance.InheritsFrom(TContainer) then
-       RTTIGetProperties(TContainer(AInstance).Hosted,Filter,'public');
+       if TContainer(AInstance).Typ<>nil then
+           RTTIGetProperties(TContainer(AInstance).Typ.Hosted,Filter,'public');
     if Filter.IndexOf(APropInfo^.Name)=-1 then AIncludeProp:=false;
 end;
 
@@ -206,10 +220,10 @@ begin
           if fPage<>nil then
              TPageSheet(ActiveDialog.Page).UpdateControl(TControl(Properties.Objects[0]),p,v);
        end
-    end; 
+    end;
     { }   with TPageSheet(ActiveDialog.Page) do
          UpdateControl(TControl(Properties.Objects[0]),Properties.ActiveItem.Caption,Properties.ActiveItem.DisplayValue);
-    
+
 end;
 
 procedure TInspector.menuFontClick(Sender: TObject);
@@ -224,8 +238,10 @@ end;
 
 procedure TInspector.ListViewDblClick(Sender: TObject);
 var
-   e:string;
+   e,re:string;
    T,ET:TType;
+   A:TStrings;
+   F:TField;
 begin
     if ListView.Selected<>nil then begin
        e:=ListView.Selected.Caption;
@@ -233,9 +249,21 @@ begin
        if T<>nil then begin
           ET:=Launcher.TypeExists(T.Return) ;
           if ET<>nil then begin
-             if ActiveEditor.UpdateEvent(TControl(Properties.Objects[0]),e,'('+ET.Params+')')<>'' then begin
+             re:= ActiveEditor.UpdateEvent(TControl(Properties.Objects[0]),e,'('+ET.Params+')');
+             if re<>'' then begin
                 ListView.Selected.Checked:=true;
-                TContainer(Properties.Objects[0]).AssignedEvents.AddObject(e,ET);
+                if Properties.Objects[0].InheritsFrom(TDialog) then
+                   A:=TDialog(Properties.Objects[0]).AssignedEvents
+                else
+                if Properties.Objects[0].InheritsFrom(TContainer) then
+                   A:=TContainer(Properties.Objects[0]).AssignedEvents;
+                if A<>nil then begin
+                   F:=TField(A.IndexOf(e));
+                   if F<>nil then begin
+                      F.Return:=re;
+                      ListView.Selected.Subitems.Add(F.Hosted)
+                   end;
+                end
              end
           end
        end ; 

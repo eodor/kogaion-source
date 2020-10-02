@@ -1,8 +1,8 @@
 object Settings: TSettings
-  Left = 412
-  Top = 162
+  Left = 411
+  Top = 137
   Width = 581
-  Height = 466
+  Height = 516
   BorderStyle = bsSizeToolWin
   Caption = 'Settings'
   Color = clBtnFace
@@ -20,14 +20,14 @@ object Settings: TSettings
   OnShow = FormShow
   DesignSize = (
     563
-    421)
+    471)
   PixelsPerInch = 115
   TextHeight = 16
   object PageControl: TPageControl
     Left = 9
     Top = 3
     Width = 546
-    Height = 374
+    Height = 424
     ActivePage = TabGeneral
     Anchors = [akLeft, akTop, akRight, akBottom]
     TabOrder = 0
@@ -35,10 +35,10 @@ object Settings: TSettings
       Caption = '&General '
       DesignSize = (
         538
-        343)
+        393)
       object LabelFilter: TLabel
         Left = 6
-        Top = 294
+        Top = 344
         Width = 34
         Height = 16
         Anchors = [akLeft, akBottom]
@@ -106,7 +106,7 @@ object Settings: TSettings
       end
       object cbxFilters: TComboBox
         Left = 55
-        Top = 294
+        Top = 344
         Width = 467
         Height = 24
         Anchors = [akLeft, akRight, akBottom]
@@ -186,8 +186,24 @@ object Settings: TSettings
         Top = 262
         Width = 394
         Height = 19
-        Caption = 'Show Only &One Error'
+        Caption = 'Show Only &One Error only'
         TabOrder = 15
+      end
+      object cbxReadUnregisterClass: TCheckBox
+        Left = 9
+        Top = 286
+        Width = 394
+        Height = 19
+        Caption = 'Read also &unregister class'
+        TabOrder = 16
+      end
+      object cbxAlowPlugins: TCheckBox
+        Left = 9
+        Top = 310
+        Width = 394
+        Height = 19
+        Caption = 'Allow load &Plugins'
+        TabOrder = 17
       end
     end
     object TabDesigner: TTabSheet
@@ -270,7 +286,7 @@ object Settings: TSettings
       ImageIndex = 2
       DesignSize = (
         538
-        343)
+        393)
       object LabelPzth: TLabel
         Left = 7
         Top = 22
@@ -353,7 +369,7 @@ object Settings: TSettings
       ImageIndex = 3
       DesignSize = (
         538
-        343)
+        393)
       object LabelAppHelpFile: TLabel
         Left = 7
         Top = 112
@@ -395,7 +411,7 @@ object Settings: TSettings
         Width = 454
         Height = 24
         Anchors = [akLeft, akTop, akRight]
-        ItemHeight = 16
+        ItemHeight = 0
         TabOrder = 2
       end
     end
@@ -404,7 +420,7 @@ object Settings: TSettings
       ImageIndex = 4
       DesignSize = (
         538
-        343)
+        393)
       object LabelDirs: TLabel
         Left = 8
         Top = 48
@@ -416,24 +432,27 @@ object Settings: TSettings
         Left = 8
         Top = 68
         Width = 521
-        Height = 227
+        Height = 277
         Anchors = [akLeft, akTop, akRight, akBottom]
         ItemHeight = 16
+        PopupMenu = PopupMenuDirs
         TabOrder = 0
+        OnClick = ListBoxDirsClick
+        OnDblClick = ListBoxDirsDblClick
       end
-      object btnAddDir: TBitBtn
+      object btnAddPath: TBitBtn
         Left = 7
-        Top = 302
+        Top = 356
         Width = 75
         Height = 25
         Anchors = [akLeft, akBottom]
         Caption = '&Add...'
         TabOrder = 1
-        OnClick = btnAddDirClick
+        OnClick = btnAddPathClick
       end
       object btnLibrary: TBitBtn
         Left = 449
-        Top = 7
+        Top = 10
         Width = 75
         Height = 25
         Anchors = [akRight]
@@ -449,11 +468,70 @@ object Settings: TSettings
         Anchors = [akLeft, akTop, akRight]
         TabOrder = 3
       end
+      object btnRemovePath: TBitBtn
+        Left = 87
+        Top = 356
+        Width = 75
+        Height = 25
+        Anchors = [akLeft, akBottom]
+        Caption = '&Remove'
+        Enabled = False
+        TabOrder = 4
+        OnClick = btnRemovePathClick
+      end
+    end
+    object TabModules: TTabSheet
+      Caption = '&Modules(DLLs)'
+      ImageIndex = 5
+      DesignSize = (
+        538
+        393)
+      object ListBoxDLLs: TListBox
+        Left = 8
+        Top = 4
+        Width = 521
+        Height = 232
+        Anchors = [akLeft, akTop, akRight, akBottom]
+        ItemHeight = 16
+        PopupMenu = PopupMenuDLLs
+        TabOrder = 0
+        OnClick = ListBoxDLLsClick
+        OnDblClick = ListBoxDLLsDblClick
+      end
+      object btnAddDLL: TBitBtn
+        Left = 8
+        Top = 359
+        Width = 75
+        Height = 25
+        Anchors = [akLeft, akBottom]
+        Caption = '&Add...'
+        TabOrder = 1
+        OnClick = btnAddDLLClick
+      end
+      object btnRemoveDLLs: TBitBtn
+        Left = 88
+        Top = 359
+        Width = 75
+        Height = 25
+        Anchors = [akLeft, akBottom]
+        Caption = '&Remove'
+        Enabled = False
+        TabOrder = 2
+        OnClick = btnRemoveDLLsClick
+      end
+      object ListBoxClasses: TListBox
+        Left = 8
+        Top = 228
+        Width = 521
+        Height = 97
+        ItemHeight = 16
+        TabOrder = 3
+      end
     end
   end
   object btCancel: TBitBtn
     Left = 347
-    Top = 383
+    Top = 433
     Width = 92
     Height = 30
     Anchors = [akRight, akBottom]
@@ -465,7 +543,7 @@ object Settings: TSettings
   end
   object btOK: TBitBtn
     Left = 455
-    Top = 383
+    Top = 433
     Width = 92
     Height = 30
     Anchors = [akRight, akBottom]
@@ -473,5 +551,32 @@ object Settings: TSettings
     ModalResult = 1
     TabOrder = 2
     OnClick = btOKClick
+  end
+  object PopupMenuDirs: TPopupMenu
+    Left = 97
+    Top = 82
+    object menuAddPath: TMenuItem
+      Caption = '&Add...'
+      OnClick = menuAddPathClick
+    end
+    object menuRemovePath: TMenuItem
+      Caption = '&Remove'
+      OnClick = menuRemovePathClick
+    end
+    object N1: TMenuItem
+      Caption = '-'
+    end
+    object menuCopyDir: TMenuItem
+      Caption = '&Copy'
+      OnClick = menuCopyDirClick
+    end
+  end
+  object PopupMenuDLLs: TPopupMenu
+    Left = 141
+    Top = 82
+    object menuCopyDLLs: TMenuItem
+      Caption = '&Copy'
+      OnClick = menuCopyDLLsClick
+    end
   end
 end

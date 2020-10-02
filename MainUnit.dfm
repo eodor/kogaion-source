@@ -1,6 +1,6 @@
 object Main: TMain
-  Left = 211
-  Top = 124
+  Left = 176
+  Top = 116
   Width = 999
   Height = 130
   Caption = 'Kogaion'
@@ -16,7 +16,9 @@ object Main: TMain
   Menu = MainMenu
   OldCreateOrder = False
   OnClose = FormClose
+  OnCloseQuery = FormCloseQuery
   OnCreate = FormCreate
+  OnDestroy = FormDestroy
   OnShortCut = FormShortCut
   OnShow = FormShow
   PixelsPerInch = 115
@@ -1857,13 +1859,16 @@ object Main: TMain
       end
       object N22: TMenuItem
         Caption = '-'
+        Visible = False
       end
       object menuAddtoProject: TMenuItem
         Caption = '&Add...'
+        Visible = False
         OnClick = menuAddtoProjectClick
       end
       object menuRemovefromProject: TMenuItem
         Caption = '&Remove'
+        Visible = False
         OnClick = menuRemovefromProjectClick
       end
       object N36: TMenuItem
@@ -1897,6 +1902,13 @@ object Main: TMain
       object menuGroup: TMenuItem
         Caption = '&Group...'
         OnClick = menuGroupClick
+      end
+      object N43: TMenuItem
+        Caption = '-'
+      end
+      object menuOptions: TMenuItem
+        Caption = 'Options...'
+        OnClick = menuOptionsClick
       end
     end
     object menuAction: TMenuItem
@@ -1958,6 +1970,7 @@ object Main: TMain
     end
     object menuAbout: TMenuItem
       Caption = '&About'
+      OnClick = menuAboutClick
       object menuHelp: TMenuItem
         Caption = '&Help'
         ShortCut = 112
@@ -1989,30 +2002,30 @@ object Main: TMain
         Caption = '&Language'
         OnClick = menuLanguageClick
       end
+      object N42: TMenuItem
+        Caption = '-'
+      end
+      object menuFileType: TMenuItem
+        Caption = 'File Type Association...'
+        Visible = False
+        OnClick = menuFileTypeClick
+      end
       object N38: TMenuItem
         Caption = '-'
       end
       object menuIDEMode: TMenuItem
         Caption = '&IDE Mode'
-        Visible = False
         object menuVB: TMenuItem
           AutoCheck = True
           Caption = 'VB'
           RadioItem = True
-          OnClick = menuClassicClick
+          OnClick = menuVBClick
         end
         object menuDelphi: TMenuItem
           AutoCheck = True
           Caption = 'Delphi'
           RadioItem = True
-          OnClick = menuClassicClick
-        end
-        object menuClassic: TMenuItem
-          AutoCheck = True
-          Caption = 'Classic'
-          RadioItem = True
-          Visible = False
-          OnClick = menuClassicClick
+          OnClick = menuDelphiClick
         end
       end
     end

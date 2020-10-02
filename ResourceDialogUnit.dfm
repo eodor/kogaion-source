@@ -131,6 +131,7 @@ object ResourcesDialog: TResourcesDialog
         ViewStyle = vsReport
         OnClick = ListViewClick
         OnColumnClick = ListViewColumnClick
+        OnDblClick = ListViewDblClick
         OnEdited = ListViewEdited
         OnResize = ListViewResize
       end
@@ -158,11 +159,22 @@ object ResourcesDialog: TResourcesDialog
         Highlighter = RC
       end
     end
+    object TabView: TTabSheet
+      Caption = '&View'
+      ImageIndex = 2
+      object ImageEdit: TImage
+        Left = 8
+        Top = 16
+        Width = 209
+        Height = 201
+        Stretch = True
+      end
+    end
   end
   object PopupMenu: TPopupMenu
     OnPopup = PopupMenuPopup
-    Left = 108
-    Top = 66
+    Left = 260
+    Top = 138
     object menuLoad: TMenuItem
       Caption = '&Load...'
       OnClick = menuLoadClick

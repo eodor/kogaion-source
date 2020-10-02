@@ -1,19 +1,13 @@
 unit PageSheetUnit;
 
-{$IFDEF FPC}
-  {$MODE Delphi}
-{$ENDIF}
 
 interface
 
 uses
-{$IFnDEF FPC}
-  Windows,
-{$ELSE}
-  LCLIntf, LCLType, LMessages,
-{$ENDIF}
-  SysUtils, Messages, Classes, Controls, Dialogs, ComCtrls, DialogUnit, EditFrame,
-   ScannerUnit, Graphics, TypInfo,  SynEditTypes, TypesUnit, FreeBasicRTTI, SynEditMiscClasses;
+   Windows,
+   SysUtils, Messages, Classes, Controls, Dialogs, ComCtrls, DialogUnit, EditFrame,
+   ScannerUnit, Graphics, TypInfo, SynEdit, SynEditTypes, FreeBasicRTTI,
+   SynEditMiscClasses, TypesUnit;
 
 type
    TPageSheet=class(TTabSheet)
@@ -40,6 +34,7 @@ type
    constructor Create(AOwner:TComponent); override;
    destructor Destroy; override;
    function Dispose:integer;
+   procedure SilentSave(v:string);
    procedure Save;
    procedure SaveAs;
    procedure Select(v:TObject);
@@ -97,7 +92,13 @@ begin
    if fDialog<>nil then begin
       Inspector.Reset;
       fDialog.Page:=nil;
-      if CanFreeDialog then fDialog.Free;
+      if CanFreeDialog then begin
+         if Launcher.ideMode=mdVB then
+            if fDialog.Sheet<>nil then
+               fDialog.Sheet.Free
+            else
+               fDialog.Free;
+      end;
    end;
    i:=PagesList.IndexOfObject(self);
    if i>-1 then PagesList.Delete(i);
@@ -152,9 +153,9 @@ end;
 
 procedure TPageSheet.SetHasDialog(v:boolean);
 begin
-    fHasDialog:=v;  
+    fHasDialog:=v;
     if v then
-       if fDialog=nil then begin 
+       if fDialog=nil then begin
           ActiveDialog:=TDialog.Create(nil);
           Dialog:=ActiveDialog;
           fDialog.Page:=self;
@@ -164,8 +165,10 @@ begin
           if assigned(fsethasdialog) then fsethasdialog(self);
        end;
     if not v then
-       if fDialog<>nil then
+       if fDialog<>nil then begin
           fDialog.Free;
+          fDialog:=nil;
+       end;
 end;
 
 procedure TPageSheet.SetSaved(v:boolean);
@@ -187,17 +190,27 @@ begin
        fFrame.Edit.Lines.LoadFromFile(v);
        Caption:=ExtractFileName(v);
     end else begin
-       fFileName:='';
-       fFrame.Edit.Text:=v;
+       if (pos(#10,v)>1) then
+          fFrame.Edit.Text:=v
+       else
+          fFileName:=v; 
     end
 end;
 
 procedure TPageSheet.Save;
-begin 
+begin
     if FileExists(fFileName) then begin
        fFrame.Edit.Lines.SaveToFile(fFileName);
        Saved:=true; Scanner.Scan;
     end else SaveAs;
+end;
+
+procedure TPageSheet.SilentSave(v:string);
+begin
+    if v<>'' then begin
+       fFrame.Edit.Lines.SaveToFile(v);
+       Saved:=true
+    end
 end;
 
 procedure TPageSheet.SaveAs;
@@ -254,9 +267,13 @@ begin
                 Save
              else
                 SaveAs;
-       mrcancel:begin result:=mrcancel; exit; end;
+       mrcancel:begin result:=mrcancel; end;
        end;
-    Free
+    if result=mrCancel then Exit;
+    try
+       Free
+    except messageDlg('Internal error $em: can''t free memory.',mtError,[mbok],0);
+    end ;
 end;
 
 function TPageSheet.InsertDialog:string;
@@ -279,29 +296,29 @@ begin
        if pos(lowercase(fDialog.Name),lowercase(fFrame.Edit.Text))=0 then
           if pos('extends ',lowercase(fFrame.Edit.Text))=0 then begin
              fDialog.Page:=Self;
-             if fDialog.Hosted<>'' then
-                if fDialog.Hosted[1] in ['Q','q'] then
-                   fDialog.Name:=copy(fDialog.Hosted,2,length(fDialog.Hosted)) else fDialog.Name:=fDialog.Hosted;
-             t:=fDialog.Extends;
+             if fDialog.Typ.Hosted<>'' then
+                if fDialog.Typ.Hosted[1] in ['Q','q'] then
+                   fDialog.Name:=copy(fDialog.Typ.Hosted,2,length(fDialog.Typ.Hosted)) else fDialog.Name:=fDialog.Typ.Hosted;
+             t:=fDialog.Typ.Extends;
              fDialog.Visible:=true;
              with fFrame.Edit.Lines do begin
                   if pos('-include ',lowercase(Launcher.Switch))=0 then begin
                      Add(format('#include once "%s"',[ifl]));
                      Add('');
                   end;
-                  AddObject(format('type %s extends %s',[fDialog.Hosted,t]),fDialog);
+                  AddObject(format('type %s extends %s',[fDialog.Typ.Hosted,t]),fDialog);
                   AddObject('    public:',fDialog);
                   Add('    declare operator cast as any ptr');
                   Add('    declare constructor');
                   AddObject('end type',fDialog);
                   Add('');
-                  Add(format('var %s=%s',[fDialog.Name,fDialog.Hosted]));
+                  Add(format('var %s=%s',[fDialog.Name,fDialog.Typ.Hosted]));
                   Add('');
-                  Add(format('operator %s.cast as any ptr',[fDialog.Hosted]));
+                  Add(format('operator %s.cast as any ptr',[fDialog.Typ.Hosted]));
                   Add('   return @this');
                   Add('end operator');
                   Add('');
-                  AddObject(format('constructor %s',[fDialog.Hosted]),fDialog);
+                  AddObject(format('constructor %s',[fDialog.Typ.Hosted]),fDialog);
                   AddObject(format('    this.Name="%s"',[fDialog.Name]),fDialog);
                   AddObject(format('    this.Text="%s"',[fDialog.Caption]),fDialog);
                   AddObject(format('    this.SetBounds(%d,%d,%d,%d)',[fDialog.Left,fDialog.Top,fDialog.Width,fDialog.Height]),fDialog);
@@ -536,7 +553,15 @@ begin
         for x:=1 to B.Char-2 do
             sp:=sp+' ';
         if F<>nil then
-           Frame.Edit.Lines.InsertObject(B.Line-1,sp+s+' = '+F.Value,o);
+           if Scanner.Variables.IndexOf(o.Name)=-1 then begin
+              Frame.Edit.Lines.InsertObject(B.Line-1,sp+s+'='+F.Value,o);
+              if TContainer(o).AssignedEvents.IndexOf(evn)=-1 then
+                 TContainer(o).AssignedEvents.AddObject(evn,F);
+           end else begin
+              Frame.Edit.Lines.InsertObject(B.Line-1,sp+'this.'+evn+'='+F.Value,o) ;
+              if TDialog(o).AssignedEvents.IndexOf(evn)=-1 then
+                 TDialog(o).AssignedEvents.AddObject(evn,F);
+           end
      end
   end;
   if (pos('type',lowercase(Frame.Edit.Text))>0) and (pos(' extends ',lowercase(Frame.Edit.Text))>0) then
@@ -550,6 +575,7 @@ begin
   L.AddObject('    '' your code here',o) ;
   L.AddObject('end sub',o) ;
   Frame.Edit.Lines.AddStrings(L);
+  Scanner.Execute;
   L.Free;
 end;
 

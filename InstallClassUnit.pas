@@ -1,19 +1,11 @@
 unit InstallClassUnit;
 
-{$IFDEF FPC}
-  {$MODE Delphi}
-{$ENDIF}
-
 interface
 
 uses
-{$IFnDEF FPC}
   Windows,
-{$ELSE}
-  LCLIntf, LCLType, LMessages,
-{$ENDIF}
   Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, Buttons, TypesUnit, IniFiles, StrUtils ;
+  Dialogs, StdCtrls, Buttons, TypesUnit, IniFiles, StrUtils, ExtCtrls ;
 
 type
   TInstallClass = class(TForm)
@@ -22,6 +14,7 @@ type
     btnClassfile: TBitBtn;
     btnOK: TBitBtn;
     btnCancel: TBitBtn;
+    Bevel: TBevel;
     procedure btnClassfileClick(Sender: TObject);
   private
     { Private declarations }
@@ -81,7 +74,7 @@ begin
             if pos ('_registerclasses',lowercase(s))>0 then begin
                pal:=copy(s,pos('#define ',lowercase(s))+6,pos('_',s)-pos('#define ',lowercase(s))+6);
                cls:=trim(copy(s,pos('"',s)+1,lastdelimiter('"',s)-pos('"',s)-1));
-               F.Text:=StringReplace(cls,',',#10,[rfreplaceall]);
+               L.Text:=StringReplace(cls,',',#10,[rfreplaceall]);
                runtimedsgn:=true;
             end;
          if pos('#include ',lowercase(s))>0 then begin
@@ -93,17 +86,16 @@ begin
          skip:
          inc(i);
    until i>L.Count-1;
-   L.Free;
-   
-   if F.Text='' then
-      installCls(v)
-   {else
-      for i:=0 to F.Count-1 do
-          installCls(F[i])};
 
+   if F.Text<>'' then
+      for i:=0 to F.Count-1 do
+          installCls(F[i]){};
+   L.Free;
    F.Free;
    if not runtimedsgn then
-      messageDlg(format('The %s package is not runtime design package.'#10'Was not installed.',[v]),mtInformation,[mbok],0);
+      messageDlg(format('The %s package is not runtime design package.'#10'Was not installed.',[v]),mtInformation,[mbok],0)
+   else
+      messageDlg(format('The %s package was installed.'#10'It containt the %s classes.',[v,L.text]),mtInformation,[mbok],0);
 end;
 
 procedure TInstallClass.InstallCls(v:string;silent:boolean=true);
@@ -130,7 +122,7 @@ begin
    Sc.FileName:=v;
    Sc.Scan;
 
-   C:=TStringList.Create;
+   {}C:=TStringList.Create;
    L:=TStringList.Create;
    L.LoadFromFile(v);
    if (pos('type ',lowercase(L.text))=0) and
@@ -185,8 +177,6 @@ begin
          
       end;
    end;
-
-   L.Free;
 
    s:=ChangeFileExt(v,'.bmp');
    if FileExists(s) then begin

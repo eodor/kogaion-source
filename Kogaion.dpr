@@ -1,14 +1,7 @@
 program Kogaion;
 
-{$IFDEF FPC}
-  {$MODE Delphi}
-{$ENDIF}
-
 uses
-{$IFnDEF FPC}
-{$ELSE}
-  Interfaces,
-{$ENDIF}
+  SysUtils,
   Forms,
   MainUnit in 'MainUnit.pas' {Main},
   CodeUnit in 'CodeUnit.pas' {Code},
@@ -47,10 +40,13 @@ uses
   ComponentContainerUnit in 'ComponentContainerUnit.pas',
   ProjectPropertiesUnit in 'ProjectPropertiesUnit.pas' {ProjectProperties},
   CloseSelectionUnit in 'CloseSelectionUnit.pas' {CloseSelection},
-  ColorButton in '..\..\..\..\Program Files\Delphi7SE\Lib\ColorButton.pas',
-  unSystemInformation in 'unSystemInformation.pas';
+  AssociationUnit in 'AssociationUnit.pas' {Association},
+  DialogSheetUnit in 'DialogSheetUnit.pas';
 
 {$R *.res}
+
+exports
+     pnewEditor,pnewDialog,pnewProject;
 
 begin
   Application.Initialize;
@@ -84,6 +80,7 @@ begin
   Application.CreateForm(TActiveX, ActiveX);
   Application.CreateForm(TProjectProperties, ProjectProperties);
   Application.CreateForm(TCloseSelection, CloseSelection);
+  Application.CreateForm(TAssociation, Association);
   Splash.Show;
   Application.Run;
 end.
